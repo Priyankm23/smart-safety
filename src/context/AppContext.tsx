@@ -41,6 +41,9 @@ import {
   SafetyEvent,
   sendSafetyLocationUpdate,
 } from "../services/safetyLocationService";
+import touristSocketService, {
+  SafetyScoreData,
+} from "../services/touristSocketService";
 
 const decodeBase64 = (str: string): string => {
   return Buffer.from(str, "base64").toString("binary");
@@ -86,10 +89,10 @@ type User = {
 } | null;
 
 type Contact = { id: string; name: string; phone: string };
-type Trip = { 
-  id: string; 
-  title: string; 
-  date: string; 
+type Trip = {
+  id: string;
+  title: string;
+  date: string;
   notes?: string;
   dayWiseItinerary?: Array<{
     dayNumber: number;
@@ -171,7 +174,9 @@ type AppContextValue = {
   createGroup: (
     groupData: any,
   ) => Promise<{ ok: boolean; message: string; groupId?: string }>;
-  updateGroupItinerary: (itinerary: any[]) => Promise<{ ok: boolean; message: string }>;
+  updateGroupItinerary: (
+    itinerary: any[],
+  ) => Promise<{ ok: boolean; message: string }>;
   logout: () => Promise<void>;
   updateProfile: (patch: Partial<NonNullable<User>>) => Promise<void>;
   addContact: (c: Omit<Contact, "id">) => void;
@@ -657,7 +662,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const requested = await Location.requestForegroundPermissionsAsync();
         return requested.status === "granted";
       } catch (error) {
-        console.warn("[SafetyTracking] Location permission check failed:", error);
+        console.warn(
+          "[SafetyTracking] Location permission check failed:",
+          error,
+        );
         return false;
       }
     };
@@ -707,7 +715,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
           timestamp: new Date().toISOString(),
-          safetyScore: stateRef.current.computedSafetyScore || stateRef.current.user?.safetyScore || 0,
+          safetyScore:
+            stateRef.current.computedSafetyScore ||
+            stateRef.current.user?.safetyScore ||
+            0,
         });
 
         if (response) {
@@ -739,7 +750,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const dedupeKey = buildSafetyNotificationKey(event);
           const lastSentAt = safetyNotificationSentAtRef.current[dedupeKey];
           const now = Date.now();
-          if (lastSentAt && now - lastSentAt < SAFETY_NOTIFICATION_COOLDOWN_MS) {
+          if (
+            lastSentAt &&
+            now - lastSentAt < SAFETY_NOTIFICATION_COOLDOWN_MS
+          ) {
             continue;
           }
 
@@ -784,16 +798,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const checkDayChange = async () => {
       const newDay = new Date().toDateString();
       if (newDay !== currentDay) {
-        console.log('Day changed - refreshing geofences for new itinerary day');
+        console.log("Day changed - refreshing geofences for new itinerary day");
         currentDay = newDay;
-        
+
         // Reload geofences to get updated itinerary geofences for the new day
         try {
           const userId = state.user?.touristId;
           await geofenceService.loadFences(undefined, undefined, userId);
-          console.log('Geofences refreshed after day change');
+          console.log("Geofences refreshed after day change");
         } catch (error) {
-          console.warn('Failed to refresh geofences after day change:', error);
+          console.warn("Failed to refresh geofences after day change:", error);
         }
       }
     };
@@ -806,6 +820,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       clearInterval(dayChangeInterval);
+    };
+  }, [hydrated, state.user?.touristId]);
+
+  // Listen for real-time safety score updates
+  useEffect(() => {
+    // Only subscribe if we have a logged-in user with an ID
+    if (!hydrated || !state.user?.touristId) return;
+
+    console.log(
+      "[AppContext] Setting up safety score listener for user:",
+      state.user.touristId,
+    );
+
+    // Subscribe to safety score updates from socket
+    const unsubscribe = touristSocketService.onSafetyScoreUpdate(
+      (data: SafetyScoreData) => {
+        console.log(
+          "[AppContext] Received real-time safety score update:",
+          data.safetyScore,
+        );
+
+        // Update state with new score
+        setState((s) => ({
+          ...s,
+          computedSafetyScore: data.safetyScore,
+          // Also update the user object if present, to keep them in sync
+          user: s.user ? { ...s.user, safetyScore: data.safetyScore } : s.user,
+        }));
+      },
+    );
+
+    return () => {
+      console.log("[AppContext] Cleaning up safety score listener");
+      if (unsubscribe) unsubscribe();
     };
   }, [hydrated, state.user?.touristId]);
 
@@ -846,28 +894,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
 
           if (!userData) throw new Error("Failed to fetch user data");
-        
+
           // Frontend-only fallback: if role is missing from the backend response, try to derive it from the
           // JWT token returned by apiLogin. This assumes the backend has already validated and signed the token
           // and that the claims can be trusted for read-only UI purposes. If the backend does not include `role`
           // in its tourist data, this is a known limitation and should ideally be fixed on the backend instead
           // of relying on this client-side workaround.
           if (!userData.role && data.token) {
-             const decoded = parseJwt(data.token);
-             if (decoded && decoded.role) {
-                userData.role = decoded.role;
-                console.log("Patched user role from token (frontend fallback):", userData.role);
-             }
+            const decoded = parseJwt(data.token);
+            if (decoded && decoded.role) {
+              userData.role = decoded.role;
+              console.log(
+                "Patched user role from token (frontend fallback):",
+                userData.role,
+              );
+            }
           }
-          
+
           // Frontend note: `ownedGroupId` is expected to come from the backend. For new admins it may legitimately
           // be missing until a group is created. If this becomes a problem, prefer fixing the backend contract
           // rather than inferring it from JWT or other client-side data.
-          if (userData.role === 'tour-admin' && !userData.ownedGroupId) {
-              // It's possibly acceptable to have no ownedGroupId yet (new admin).
-              // Intentionally not inferring ownedGroupId from the token here to avoid relying on unvalidated claims.
+          if (userData.role === "tour-admin" && !userData.ownedGroupId) {
+            // It's possibly acceptable to have no ownedGroupId yet (new admin).
+            // Intentionally not inferring ownedGroupId from the token here to avoid relying on unvalidated claims.
           }
-
 
           // Log login response and fetched user data for debugging
           try {
@@ -925,11 +975,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return { ok: true, message: "Login successful" };
         } catch (error: any) {
           // Check if this is a group member trying to login with email/password
-          if (error.message && error.message.includes("must login using the 3-code system")) {
-            return { 
-              ok: false, 
-              message: "Group members must use the 3-code login. Click 'Group Member? Login with Codes' below.",
-              isGroupMemberError: true 
+          if (
+            error.message &&
+            error.message.includes("must login using the 3-code system")
+          ) {
+            return {
+              ok: false,
+              message:
+                "Group members must use the 3-code login. Click 'Group Member? Login with Codes' below.",
+              isGroupMemberError: true,
             };
           }
           return { ok: false, message: error.message || "An error occurred" };
@@ -937,12 +991,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
       async loginWithCodes(guideId, touristId, groupAccessCode) {
         try {
-          const data = await apiLoginWithCodes(guideId, touristId, groupAccessCode);
-          
+          const data = await apiLoginWithCodes(
+            guideId,
+            touristId,
+            groupAccessCode,
+          );
+
           if (!data.success || !data.data) {
             throw new Error(data.message || "Login failed");
           }
-          
+
           // Get full user data
           const userRes = await getTouristData(data.data.token);
           let userData: any = null;
@@ -953,13 +1011,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
 
           if (!userData) throw new Error("Failed to fetch user data");
-          
+
           // IMPORTANT: Ensure role is set from the login response
           // The getTouristData might not return role, so we use it from login response
           if (!userData.role && data.data.role) {
             userData.role = data.data.role;
           }
-          
+
           // Also ensure other fields from login response are preserved
           if (!userData.touristId && data.data.touristId) {
             userData.touristId = data.data.touristId;
@@ -967,7 +1025,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (!userData.groupId && data.data.groupId) {
             userData.groupId = data.data.groupId;
           }
-          
+
           // Build trips from userData.itinerary
           const itinerary = Array.isArray(userData.itinerary)
             ? userData.itinerary
@@ -1000,14 +1058,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             trips,
             contacts: contactsFromApi || s.contacts,
           }));
-          
+
           try {
             console.log("✅ 3-code login successful");
             console.log("   User role:", userData.role);
             console.log("   User name:", userData.name);
             console.log("   User ID:", userData.touristId);
           } catch (e) {}
-          
+
           return { ok: true, message: "Login successful" };
         } catch (error: any) {
           return { ok: false, message: error.message || "An error occurred" };
@@ -1059,11 +1117,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               ({
                 ...prev,
                 user: prev.user
-                  ? { 
-                      ...prev.user, 
+                  ? {
+                      ...prev.user,
                       ownedGroupId: data.data?.groupId,
                       role: "tour-admin" as const,
-                      groupId: data.data?.groupId
+                      groupId: data.data?.groupId,
                     }
                   : null,
                 // Also rebuild trips from the itinerary
@@ -1087,8 +1145,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         try {
           const token = tokenRef.current;
           if (!token) throw new Error("Not authenticated");
-          
-          const { updateGroupItinerary: apiUpdateGroupItinerary } = await import("../utils/api");
+
+          const { updateGroupItinerary: apiUpdateGroupItinerary } =
+            await import("../utils/api");
           const data = await apiUpdateGroupItinerary(token, itinerary);
 
           if (data?.success) {
@@ -1106,10 +1165,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               const userId = stateRef.current.user?.touristId;
               if (userId) {
                 await geofenceService.loadFences(undefined, undefined, userId);
-                console.log('Geofences refreshed after itinerary update');
+                console.log("Geofences refreshed after itinerary update");
               }
             } catch (geoErr) {
-              console.warn('Failed to refresh geofences after itinerary update:', geoErr);
+              console.warn(
+                "Failed to refresh geofences after itinerary update:",
+                geoErr,
+              );
             }
 
             return {
@@ -1185,83 +1247,125 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
 
           const userRole = state.user?.role;
-          console.log('[AppContext] updateTripsFromBackend for role:', userRole);
+          console.log(
+            "[AppContext] updateTripsFromBackend for role:",
+            userRole,
+          );
 
           // Solo travelers fetch from /api/itinerary
-          if (userRole === 'solo') {
-            console.log('[AppContext] Fetching solo itinerary...');
+          if (userRole === "solo") {
+            console.log("[AppContext] Fetching solo itinerary...");
             const { getSoloItinerary } = await import("../utils/api");
             const data = await getSoloItinerary(state.token);
-            
-            console.log('[AppContext] Solo itinerary response:', data);
-            
+
+            console.log("[AppContext] Solo itinerary response:", data);
+
             // Response structure: { success: true, data: [...dayWiseItinerary] }
             const itineraryData = data?.data || [];
-            
+
             if (Array.isArray(itineraryData) && itineraryData.length > 0) {
-              console.log('[AppContext] Converting solo itinerary to trips:', itineraryData);
+              console.log(
+                "[AppContext] Converting solo itinerary to trips:",
+                itineraryData,
+              );
               const trips = itineraryToTrips(itineraryData);
-              console.log('[AppContext] Converted trips:', trips);
+              console.log("[AppContext] Converted trips:", trips);
               setState((s) => ({ ...s, trips }));
               console.log("Solo trips updated from backend:", trips.length);
-              
+
               // Refresh geofences after solo itinerary update
               try {
                 const userId = state.user?.touristId;
                 if (userId) {
-                  await geofenceService.loadFences(undefined, undefined, userId);
-                  console.log('Geofences refreshed after solo itinerary update');
+                  await geofenceService.loadFences(
+                    undefined,
+                    undefined,
+                    userId,
+                  );
+                  console.log(
+                    "Geofences refreshed after solo itinerary update",
+                  );
                 }
               } catch (geoErr) {
-                console.warn('Failed to refresh geofences after solo itinerary update:', geoErr);
+                console.warn(
+                  "Failed to refresh geofences after solo itinerary update:",
+                  geoErr,
+                );
               }
             } else {
-              console.log('[AppContext] No solo itinerary found');
+              console.log("[AppContext] No solo itinerary found");
               setState((s) => ({ ...s, trips: [] }));
             }
           } else {
             // Group members/admins fetch from group dashboard
-            console.log('[AppContext] Fetching group dashboard...');
+            console.log("[AppContext] Fetching group dashboard...");
             const { getGroupDashboard } = await import("../utils/api");
             let groupItinerary: any[] | null = null;
             try {
               const data = await getGroupDashboard(state.token);
-              console.log('[AppContext] Group dashboard response:', data);
+              console.log("[AppContext] Group dashboard response:", data);
               const groupData = data?.data || data;
-              if (groupData && Array.isArray(groupData.itinerary) && groupData.itinerary.length > 0) {
+              if (
+                groupData &&
+                Array.isArray(groupData.itinerary) &&
+                groupData.itinerary.length > 0
+              ) {
                 groupItinerary = groupData.itinerary;
               }
             } catch (dashErr: any) {
-              console.warn('[AppContext] Group dashboard failed, will use user itinerary:', dashErr?.message);
+              console.warn(
+                "[AppContext] Group dashboard failed, will use user itinerary:",
+                dashErr?.message,
+              );
             }
 
             if (groupItinerary && groupItinerary.length > 0) {
-              console.log('[AppContext] Found group itinerary:', groupItinerary.length, 'days');
+              console.log(
+                "[AppContext] Found group itinerary:",
+                groupItinerary.length,
+                "days",
+              );
               const trips = itineraryToTrips(groupItinerary);
-              console.log('[AppContext] Converted trips:', trips);
+              console.log("[AppContext] Converted trips:", trips);
               setState((s) => ({ ...s, trips }));
               console.log("Group trips updated from backend:", trips.length);
-              
+
               // Refresh geofences after group itinerary fetch
               try {
                 const userId = state.user?.touristId;
                 if (userId) {
-                  await geofenceService.loadFences(undefined, undefined, userId);
-                  console.log('Geofences refreshed after group itinerary fetch');
+                  await geofenceService.loadFences(
+                    undefined,
+                    undefined,
+                    userId,
+                  );
+                  console.log(
+                    "Geofences refreshed after group itinerary fetch",
+                  );
                 }
               } catch (geoErr) {
-                console.warn('Failed to refresh geofences after group itinerary fetch:', geoErr);
+                console.warn(
+                  "Failed to refresh geofences after group itinerary fetch:",
+                  geoErr,
+                );
               }
             } else {
               // Fallback: use the user's own dayWiseItinerary
               const fallbackItinerary = state.user?.dayWiseItinerary || [];
-              if (Array.isArray(fallbackItinerary) && fallbackItinerary.length > 0) {
-                console.log('[AppContext] Using user dayWiseItinerary as fallback:', fallbackItinerary.length, 'days');
+              if (
+                Array.isArray(fallbackItinerary) &&
+                fallbackItinerary.length > 0
+              ) {
+                console.log(
+                  "[AppContext] Using user dayWiseItinerary as fallback:",
+                  fallbackItinerary.length,
+                  "days",
+                );
                 const trips = itineraryToTrips(fallbackItinerary);
                 setState((s) => ({ ...s, trips }));
                 console.log("User trips updated from backend:", trips.length);
               } else {
-                console.log('[AppContext] No itinerary found anywhere');
+                console.log("[AppContext] No itinerary found anywhere");
                 setState((s) => ({ ...s, trips: [] }));
               }
             }

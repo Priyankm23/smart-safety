@@ -1,19 +1,19 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { StyleSheet, Platform, Alert, Dimensions, View } from 'react-native';
-import { WebView } from 'react-native-webview';
-import * as Location from 'expo-location';
-import { useApp } from '../../../context/AppContext';
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import { StyleSheet, Platform, Alert, Dimensions, View } from "react-native";
+import { WebView } from "react-native-webview";
+import * as Location from "expo-location";
+import { useApp } from "../../../context/AppContext";
 
 // Import path deviation context
-import { usePathDeviation } from '../../../context/PathDeviationContext';
+import { usePathDeviation } from "../../../context/PathDeviationContext";
 
 // Import sub-components
-import MapHeader from './MapboxMap/MapHeader';
-import ErrorMessage from './MapboxMap/ErrorMessage';
-import MapContainer from './MapboxMap/MapContainer';
-import LocationInfo from './MapboxMap/LocationInfo';
-import MapActionButtons from './MapboxMap/MapActionButtons';
-import StyleSelector from './MapboxMap/StyleSelector';
+import MapHeader from "./MapboxMap/MapHeader";
+import ErrorMessage from "./MapboxMap/ErrorMessage";
+import MapContainer from "./MapboxMap/MapContainer";
+import LocationInfo from "./MapboxMap/LocationInfo";
+import MapActionButtons from "./MapboxMap/MapActionButtons";
+import StyleSelector from "./MapboxMap/StyleSelector";
 
 // Import new UI overlay components
 import {
@@ -21,13 +21,18 @@ import {
   WarningBanner,
   RightActionButtons,
   MapBottomSheet,
-  LegendBottomSheet
-} from './MapboxMap/ui';
+  LegendBottomSheet,
+} from "./MapboxMap/ui";
 
 // Import types, constants and utilities
-import { WebViewMessage } from './MapboxMap/types';
-import { reverseGeocode } from './MapboxMap/geoUtils';
-import { GeoFence, filterFencesByDistance, haversineKm } from '../../../utils/geofenceLogic';
+import { WebViewMessage } from "./MapboxMap/types";
+import { reverseGeocode } from "./MapboxMap/geoUtils";
+import {
+  GeoFence,
+  filterFencesByDistance,
+  haversineKm,
+} from "../../../utils/geofenceLogic";
+import touristSocketService from "../../../services/touristSocketService";
 
 const NEARBY_FENCE_RADIUS_KM = 15;
 const LOCATION_REFILTER_THRESHOLD_KM = 5;
@@ -51,26 +56,32 @@ export default function MapboxMap({
   onLocationChange,
   style,
   zoomLevel = 15,
-  mapWidth = Dimensions.get('window').width - 32,
+  mapWidth = Dimensions.get("window").width - 32,
   mapHeight = 300,
   geoFences,
   isFullScreen = false,
-  onToggleFullScreen
+  onToggleFullScreen,
 }: MapboxMapProps) {
   const { state } = useApp();
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
-  const [address, setAddress] = useState<string>('');
+  const [location, setLocation] = useState<Location.LocationObject | null>(
+    null,
+  );
+  const [address, setAddress] = useState<string>("");
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [locationAvailable, setLocationAvailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [webViewKey, setWebViewKey] = useState(0);
-  const [selectedStyle, setSelectedStyle] = useState('streets');
+  const [selectedStyle, setSelectedStyle] = useState("streets");
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [loadedGeoFences, setLoadedGeoFences] = useState<GeoFence[]>([]);
   const [allGeoFences, setAllGeoFences] = useState<GeoFence[]>([]);
-  const [lastLocationForFilter, setLastLocationForFilter] = useState<{ lat: number; lng: number } | null>(null);
-  const [locationPermissionGranted, setLocationPermissionGranted] = useState<boolean>(false);
+  const [lastLocationForFilter, setLastLocationForFilter] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [locationPermissionGranted, setLocationPermissionGranted] =
+    useState<boolean>(false);
 
   // New state for overlay UI
   const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(false);
@@ -86,12 +97,12 @@ export default function MapboxMap({
   const webViewRef = useRef<WebView>(null);
 
   // Connect map to path deviation tracking
-  const { setMapRef } = usePathDeviation();
+  const { setMapRef, isTracking } = usePathDeviation();
 
   // Set map reference for path deviation tracking AFTER map is ready
   useEffect(() => {
     if (mapReady && webViewRef.current) {
-      console.log('[MapboxMap] Setting map ref after map is ready');
+      console.log("[MapboxMap] Setting map ref after map is ready");
       setMapRef(webViewRef);
     }
     return () => {
@@ -99,16 +110,91 @@ export default function MapboxMap({
     };
   }, [setMapRef, mapReady]);
 
-// Request location permissions on mount and load geofences
+  // Watch user location when map is ready and not in tracking mode (journey)
+  useEffect(() => {
+    let locationSubscription: Location.LocationSubscription | null = null;
+
+    const startLocationWatch = async () => {
+      if (!showCurrentLocation || !locationPermissionGranted || isTracking)
+        return;
+
+      try {
+        locationSubscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 2000,
+            distanceInterval: 5,
+          },
+          (newLocation) => {
+            setLocation(newLocation);
+
+            // Notify parent
+            if (onLocationChange) {
+              onLocationChange(newLocation);
+            }
+
+            // Send to WebView
+            if (webViewRef.current && mapReady) {
+              webViewRef.current.postMessage(
+                JSON.stringify({
+                  type: "setLocation",
+                  location: newLocation.coords,
+                }),
+              );
+            }
+
+            // Re-filter fences if needed
+            refilterFencesIfNeeded(
+              newLocation.coords.latitude,
+              newLocation.coords.longitude,
+            );
+          },
+        );
+      } catch (err) {
+        console.error("Failed to watch location:", err);
+      }
+    };
+
+    if (mapReady && locationPermissionGranted && !isTracking) {
+      startLocationWatch();
+    }
+
+    return () => {
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
+    };
+  }, [showCurrentLocation, locationPermissionGranted, mapReady, isTracking]);
+
+  // Subscribe to risk grid updates from backend
+  useEffect(() => {
+    const unsubscribe = touristSocketService.on(
+      "riskGridUpdated",
+      (data: any) => {
+        console.log("[MapboxMap] Received risk grid update:", data);
+        if (webViewRef.current && mapReady) {
+          webViewRef.current.postMessage(
+            JSON.stringify({
+              type: "updateRiskGrid",
+              gridData: data,
+            }),
+          );
+        }
+      },
+    );
+    return unsubscribe;
+  }, [mapReady]);
+
+  // Request location permissions on mount and load geofences
   useEffect(() => {
     (async () => {
       if (showCurrentLocation) {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        const granted = status === 'granted';
+        const granted = status === "granted";
         setLocationPermissionGranted(granted);
-        
+
         if (!granted) {
-          setError('Location permission denied. Showing all safety zones.');
+          setError("Location permission denied. Showing all safety zones.");
           loadAllFencesWithoutFiltering();
           return;
         }
@@ -119,7 +205,7 @@ export default function MapboxMap({
           setLastLocationForFilter({ lat: latitude, lng: longitude });
           await loadAndFilterFences(latitude, longitude);
         } catch (err) {
-          console.warn('Failed to get location for filtering:', err);
+          console.warn("Failed to get location for filtering:", err);
           loadAllFencesWithoutFiltering();
         }
       } else {
@@ -130,26 +216,29 @@ export default function MapboxMap({
 
   const loadAllFencesWithoutFiltering = async () => {
     try {
-      const geofenceService = require('../services/geofenceService').default;
+      const geofenceService = require("../services/geofenceService").default;
       let data = geofenceService.getFences();
       if (!data || data.length === 0) {
         const userId = state.user?.touristId;
         data = await geofenceService.loadFences(undefined, undefined, userId);
       }
       if (!data || data.length === 0) {
-        data = require('../../../../assets/geofences-output.json');
+        data = require("../../../../assets/geofences-output.json");
       }
       const fencesWithDistance = data.map((f: GeoFence) => ({
         ...f,
         distanceToUser: undefined,
         // Add default visualStyle if missing (for bundled data)
-        visualStyle: f.visualStyle || getDefaultVisualStyle(f)
+        visualStyle: f.visualStyle || getDefaultVisualStyle(f),
       }));
       setAllGeoFences(fencesWithDistance);
       setLoadedGeoFences(fencesWithDistance);
-      console.log('Loaded all geo-fences (no location permission):', fencesWithDistance.length);
+      console.log(
+        "Loaded all geo-fences (no location permission):",
+        fencesWithDistance.length,
+      );
     } catch (err) {
-      console.warn('Failed to load geo-fences:', err);
+      console.warn("Failed to load geo-fences:", err);
       setAllGeoFences([]);
       setLoadedGeoFences([]);
     }
@@ -157,26 +246,33 @@ export default function MapboxMap({
 
   const loadAndFilterFences = async (userLat: number, userLng: number) => {
     try {
-      const geofenceService = require('../services/geofenceService').default;
+      const geofenceService = require("../services/geofenceService").default;
       let data = geofenceService.getFences();
       if (!data || data.length === 0) {
         const userId = state.user?.touristId;
         data = await geofenceService.loadFences(userLat, userLng, userId);
       }
       if (!data || data.length === 0) {
-        data = require('../../../../assets/geofences-output.json');
+        data = require("../../../../assets/geofences-output.json");
       }
       // Add default visualStyle to bundled data if missing
       const dataWithStyle = data.map((f: GeoFence) => ({
         ...f,
-        visualStyle: f.visualStyle || getDefaultVisualStyle(f)
+        visualStyle: f.visualStyle || getDefaultVisualStyle(f),
       }));
       setAllGeoFences(dataWithStyle);
-      const nearby = filterFencesByDistance(dataWithStyle, userLat, userLng, NEARBY_FENCE_RADIUS_KM);
+      const nearby = filterFencesByDistance(
+        dataWithStyle,
+        userLat,
+        userLng,
+        NEARBY_FENCE_RADIUS_KM,
+      );
       setLoadedGeoFences(nearby);
-      console.log(`Loaded ${dataWithStyle.length} total fences, filtered to ${nearby.length} within ${NEARBY_FENCE_RADIUS_KM}km`);
+      console.log(
+        `Loaded ${dataWithStyle.length} total fences, filtered to ${nearby.length} within ${NEARBY_FENCE_RADIUS_KM}km`,
+      );
     } catch (err) {
-      console.warn('Failed to load/filter geo-fences:', err);
+      console.warn("Failed to load/filter geo-fences:", err);
       setAllGeoFences([]);
       setLoadedGeoFences([]);
     }
@@ -184,65 +280,70 @@ export default function MapboxMap({
 
   // Helper function to add default visualStyle based on fence properties
   const getDefaultVisualStyle = (fence: GeoFence) => {
-    const category = (fence.category || '').toLowerCase();
-    const riskLevel = (fence.riskLevel || '').toLowerCase();
-    
+    const category = (fence.category || "").toLowerCase();
+    const riskLevel = (fence.riskLevel || "").toLowerCase();
+
     // Determine zone type from category
-    if (category.includes('danger') || category.includes('hazard')) {
+    if (category.includes("danger") || category.includes("hazard")) {
       return {
-        zoneType: 'danger_zone',
-        borderStyle: 'solid',
+        zoneType: "danger_zone",
+        borderStyle: "solid",
         borderWidth: 3,
         fillOpacity: 0.25,
-        fillPattern: 'diagonal-stripes',
-        iconType: 'warning-triangle',
-        renderPriority: 1
+        fillPattern: "diagonal-stripes",
+        iconType: "warning-triangle",
+        renderPriority: 1,
       };
     }
-    
-    if (category.includes('risk') || category.includes('grid')) {
+
+    if (category.includes("risk") || category.includes("grid")) {
       return {
-        zoneType: 'risk_grid',
-        borderStyle: 'dashed',
+        zoneType: "risk_grid",
+        borderStyle: "dashed",
         borderWidth: 2,
         fillOpacity: 0.4,
-        fillPattern: 'dots',
-        iconType: 'incident-marker',
+        fillPattern: "dots",
+        iconType: "incident-marker",
         renderPriority: 2,
-        gridSize: 500
+        gridSize: 500,
       };
     }
-    
+
     // Default to danger zone styling for bundled data
     return {
-      zoneType: 'danger_zone',
-      borderStyle: 'solid',
+      zoneType: "danger_zone",
+      borderStyle: "solid",
       borderWidth: 2,
       fillOpacity: 0.3,
-      fillPattern: 'solid',
-      iconType: 'warning-triangle',
-      renderPriority: 1
+      fillPattern: "solid",
+      iconType: "warning-triangle",
+      renderPriority: 1,
     };
   };
 
   // Re-filter fences when location changes significantly
-  const refilterFencesIfNeeded = useCallback((newLat: number, newLng: number) => {
-    if (lastLocationForFilter) {
-      const distance = haversineKm(
-        [newLat, newLng],
-        [lastLocationForFilter.lat, lastLocationForFilter.lng]
-      );
-      
-      if (distance >= LOCATION_REFILTER_THRESHOLD_KM) {
-        console.log(`User moved ${distance.toFixed(2)}km, re-filtering fences...`);
+  const refilterFencesIfNeeded = useCallback(
+    (newLat: number, newLng: number) => {
+      if (lastLocationForFilter) {
+        const distance = haversineKm(
+          [newLat, newLng],
+          [lastLocationForFilter.lat, lastLocationForFilter.lng],
+        );
+
+        if (distance >= LOCATION_REFILTER_THRESHOLD_KM) {
+          console.log(
+            `User moved ${distance.toFixed(2)}km, re-filtering fences...`,
+          );
+          setLastLocationForFilter({ lat: newLat, lng: newLng });
+          loadAndFilterFences(newLat, newLng);
+        }
+      } else {
         setLastLocationForFilter({ lat: newLat, lng: newLng });
         loadAndFilterFences(newLat, newLng);
       }
-    } else {
-      setLastLocationForFilter({ lat: newLat, lng: newLng });
-      loadAndFilterFences(newLat, newLng);
-    }
-  }, [lastLocationForFilter]);
+    },
+    [lastLocationForFilter],
+  );
 
   // Send geo-fences to the WebView when map is ready or when geoFences prop changes
   useEffect(() => {
@@ -252,11 +353,17 @@ export default function MapboxMap({
     if (!Array.isArray(fencesToSend)) return;
 
     try {
-      console.log(`Sending ${fencesToSend.length} geo-fences to Mapbox WebView, including custom fences:`,
-        fencesToSend.filter(f => f.id && f.id.startsWith('custom')).map(f => f.name));
-      webViewRef.current.postMessage(JSON.stringify({ type: 'setGeoFences', fences: fencesToSend }));
+      console.log(
+        `Sending ${fencesToSend.length} geo-fences to Mapbox WebView, including custom fences:`,
+        fencesToSend
+          .filter((f) => f.id && f.id.startsWith("custom"))
+          .map((f) => f.name),
+      );
+      webViewRef.current.postMessage(
+        JSON.stringify({ type: "setGeoFences", fences: fencesToSend }),
+      );
     } catch (e) {
-      console.warn('Failed to post geo-fences to Mapbox WebView', e);
+      console.warn("Failed to post geo-fences to Mapbox WebView", e);
     }
   }, [mapReady, geoFences, loadedGeoFences]);
 
@@ -265,22 +372,24 @@ export default function MapboxMap({
     const fencesToCount = geoFences || loadedGeoFences;
     if (!Array.isArray(fencesToCount)) return;
 
-    const danger = fencesToCount.filter(f => 
-      f.visualStyle?.zoneType === 'danger_zone' || 
-      (f.category && f.category.toLowerCase().includes('danger'))
+    const danger = fencesToCount.filter(
+      (f) =>
+        f.visualStyle?.zoneType === "danger_zone" ||
+        (f.category && f.category.toLowerCase().includes("danger")),
     ).length;
 
-    const risk = fencesToCount.filter(f => 
-      f.visualStyle?.zoneType === 'risk_grid' || 
-      f.category === 'Risk Grid'
+    const risk = fencesToCount.filter(
+      (f) =>
+        f.visualStyle?.zoneType === "risk_grid" || f.category === "Risk Grid",
     ).length;
 
-    const geofences = fencesToCount.filter(f => 
-      f.visualStyle?.zoneType === 'geofence' || 
-      f.visualStyle?.zoneType === 'itinerary_geofence' ||
-      f.category === 'Tourist Destination' ||
-      f.category === 'Itinerary Geofence' ||
-      f.metadata?.sourceType === 'itinerary'
+    const geofences = fencesToCount.filter(
+      (f) =>
+        f.visualStyle?.zoneType === "geofence" ||
+        f.visualStyle?.zoneType === "itinerary_geofence" ||
+        f.category === "Tourist Destination" ||
+        f.category === "Itinerary Geofence" ||
+        f.metadata?.sourceType === "itinerary",
     ).length;
 
     setDangerZoneCount(danger);
@@ -294,28 +403,28 @@ export default function MapboxMap({
       const message: WebViewMessage = JSON.parse(event.nativeEvent.data);
 
       switch (message.type) {
-        case 'mapReady':
-          console.log('Mapbox map is ready');
+        case "mapReady":
+          console.log("Mapbox map is ready");
           setMapReady(true);
           break;
-        case 'locationSelected':
+        case "locationSelected":
           if (onLocationSelect && message.location) {
             onLocationSelect(message.location);
           }
           break;
-        case 'mapClick':
+        case "mapClick":
           // Handle map click - currently we don't create geofences on click
           // but we could implement custom geofence creation functionality here if needed
-          console.log('Map clicked at:', message.lat, message.lng);
+          console.log("Map clicked at:", message.lat, message.lng);
           break;
-        case 'error':
-          setError(message.message || 'Map error occurred');
+        case "error":
+          setError(message.message || "Map error occurred");
           break;
         default:
-          console.log('Unknown message type:', message.type);
+          console.log("Unknown message type:", message.type);
       }
     } catch (err) {
-      console.error('Error parsing WebView message:', err);
+      console.error("Error parsing WebView message:", err);
     }
   };
 
@@ -331,7 +440,7 @@ export default function MapboxMap({
     return;
   }, [mapReady, showCurrentLocation]);
 
-// Get current location
+  // Get current location
   const getCurrentLocation = async () => {
     if (!showCurrentLocation) return;
 
@@ -348,16 +457,22 @@ export default function MapboxMap({
 
       // Re-filter fences if user moved significantly
       if (locationPermissionGranted) {
-        refilterFencesIfNeeded(locationResult.coords.latitude, locationResult.coords.longitude);
+        refilterFencesIfNeeded(
+          locationResult.coords.latitude,
+          locationResult.coords.longitude,
+        );
       }
 
       // Reverse geocode to get address
       setLoadingAddress(true);
       try {
-        const addressResult = await reverseGeocode(locationResult.coords.latitude, locationResult.coords.longitude);
+        const addressResult = await reverseGeocode(
+          locationResult.coords.latitude,
+          locationResult.coords.longitude,
+        );
         setAddress(addressResult);
       } catch (geoError) {
-        console.error('Reverse geocoding failed:', geoError);
+        console.error("Reverse geocoding failed:", geoError);
       } finally {
         setLoadingAddress(false);
       }
@@ -370,22 +485,26 @@ export default function MapboxMap({
       // Send location to WebView
       if (webViewRef.current) {
         try {
-          webViewRef.current.postMessage(JSON.stringify({
-            type: 'setLocation',
-            location: locationResult.coords,
-          }));
+          webViewRef.current.postMessage(
+            JSON.stringify({
+              type: "setLocation",
+              location: locationResult.coords,
+            }),
+          );
         } catch (postErr) {
           // Fallback for environments where postMessage might not be available
           const message = JSON.stringify({
-            type: 'setLocation',
+            type: "setLocation",
             location: locationResult.coords,
           });
-          webViewRef.current.injectJavaScript(`window.postMessage(${message}, '*');`);
+          webViewRef.current.injectJavaScript(
+            `window.postMessage(${message}, '*');`,
+          );
         }
       }
     } catch (err) {
-      console.error('Location error:', err);
-      setError('Failed to get current location');
+      console.error("Location error:", err);
+      setError("Failed to get current location");
       setLocationAvailable(false);
     } finally {
       setLoadingLocation(false);
@@ -403,7 +522,7 @@ export default function MapboxMap({
 
     if (url) {
       // Note: In a real app, you'd use Linking.openURL(url)
-      Alert.alert('External Map', `Would open: ${url}`);
+      Alert.alert("External Map", `Would open: ${url}`);
     }
   };
 
@@ -417,7 +536,7 @@ export default function MapboxMap({
     }
 
     // Note: In a real app, you'd use Share.share({ message })
-    Alert.alert('Share Location', message);
+    Alert.alert("Share Location", message);
   };
 
   // Handle full screen toggle
@@ -433,28 +552,38 @@ export default function MapboxMap({
     // Send style change to WebView
     if (webViewRef.current) {
       try {
-        webViewRef.current.postMessage(JSON.stringify({
-          type: 'setStyle',
-          style: style,
-        }));
+        webViewRef.current.postMessage(
+          JSON.stringify({
+            type: "setStyle",
+            style: style,
+          }),
+        );
       } catch (postErr) {
         const message = JSON.stringify({
-          type: 'setStyle',
+          type: "setStyle",
           style: style,
         });
-        webViewRef.current.injectJavaScript(`window.postMessage(${message}, '*');`);
+        webViewRef.current.injectJavaScript(
+          `window.postMessage(${message}, '*');`,
+        );
       }
     }
   };
 
   return (
-    <View style={[styles.container, isFullScreen ? styles.containerFullScreen : undefined, style]}>
+    <View
+      style={[
+        styles.container,
+        isFullScreen ? styles.containerFullScreen : undefined,
+        style,
+      ]}
+    >
       {isFullScreen ? (
         // Full-screen: render map with overlay UI components
         <View style={styles.fullScreenContainer}>
           <MapContainer
             webViewKey={webViewKey}
-            height={Dimensions.get('window').height}
+            height={Dimensions.get("window").height}
             onWebViewMessage={handleWebViewMessage}
             webViewRef={webViewRef}
             isFullScreen={isFullScreen}
@@ -473,14 +602,17 @@ export default function MapboxMap({
             onSOSPress={() => {
               setShowStyleSelector(false);
               setIsLegendExpanded(false);
-              setIsBottomSheetExpanded(prev => !prev);
+              setIsBottomSheetExpanded((prev) => !prev);
             }}
             onLegendPress={() => {
-              console.log('[MapboxMap] Legend button pressed, current state:', isLegendExpanded);
+              console.log(
+                "[MapboxMap] Legend button pressed, current state:",
+                isLegendExpanded,
+              );
               // Close other bottom sheets
               setShowStyleSelector(false);
               setIsBottomSheetExpanded(false);
-              setIsLegendExpanded(prev => !prev);
+              setIsLegendExpanded((prev) => !prev);
             }}
           />
 
@@ -500,17 +632,17 @@ export default function MapboxMap({
             isExpanded={isBottomSheetExpanded}
             onToggle={() => {
               setIsLegendExpanded(false);
-              setIsBottomSheetExpanded(prev => !prev);
+              setIsBottomSheetExpanded((prev) => !prev);
             }}
             onShareLive={shareLocation}
-            onSOS={() => Alert.alert('SOS', 'Emergency SOS activated!')}
+            onSOS={() => Alert.alert("SOS", "Emergency SOS activated!")}
           />
 
           <LegendBottomSheet
             isExpanded={isLegendExpanded}
             onToggle={() => {
               setIsBottomSheetExpanded(false);
-              setIsLegendExpanded(prev => !prev);
+              setIsLegendExpanded((prev) => !prev);
             }}
             dangerZoneCount={dangerZoneCount}
             riskGridCount={riskGridCount}
@@ -534,7 +666,9 @@ export default function MapboxMap({
             isFullScreen={isFullScreen}
           />
 
-          {error && <ErrorMessage errorMsg={error} onRetry={getCurrentLocation} />}
+          {error && (
+            <ErrorMessage errorMsg={error} onRetry={getCurrentLocation} />
+          )}
 
           <LocationInfo
             location={location}
@@ -572,17 +706,17 @@ const styles = StyleSheet.create({
   },
   fullScreenContainer: {
     flex: 1,
-    position: 'relative',
+    position: "relative",
   },
   styleSelectorOverlay: {
-    position: 'absolute',
+    position: "absolute",
     right: 70,
-    top: '35%',
+    top: "35%",
     zIndex: 95,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 12,
     padding: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -591,6 +725,6 @@ const styles = StyleSheet.create({
   cardFullScreen: {
     margin: 0,
     borderRadius: 0,
-    height: Dimensions.get('window').height,
+    height: Dimensions.get("window").height,
   },
 });

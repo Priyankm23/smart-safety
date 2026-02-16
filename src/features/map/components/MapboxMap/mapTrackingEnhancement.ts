@@ -157,22 +157,12 @@ export const getTrackingEnhancementScript = (): string => {
         });
       }
 
-      // Smoothly follow user (don't jump camera too aggressively)
-      const currentCenter = map.getCenter();
-      const distance = turf.distance(
-        [currentCenter.lng, currentCenter.lat],
-        [lng, lat],
-        { units: 'meters' }
-      );
-
-      // Only recenter if user moves more than 100 meters from center
-      if (distance > 100) {
-        map.easeTo({
+      // Always recenter on user during tracking to follow movement
+      map.easeTo({
           center: [lng, lat],
           duration: 1000,
           essential: true
-        });
-      }
+      });
     }
 
     /**

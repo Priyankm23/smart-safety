@@ -27,6 +27,7 @@ import { queueSOS } from "../../../utils/offlineQueue";
 import { sendSMS } from "../../../utils/sms";
 import { queueSMS } from "../../../utils/smsQueue";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import touristSocketService from "../../../services/touristSocketService";
 
 interface PanicActionsProps {
   onSOSTriggered?: () => void;
@@ -297,6 +298,18 @@ export default function PanicActions({
       console.log("[PanicActions] Triggering SOS:", label);
       await triggerSOS(currentToken, sosData);
 
+      // Force update location and request immediate safety score recalculation
+      console.log(
+        "[PanicActions] Requesting safety score update after SOS trigger",
+      );
+      if (currentLocation && currentLocation.coords) {
+        touristSocketService.updateLocation({
+          lat: currentLocation.coords.latitude,
+          lng: currentLocation.coords.longitude,
+        });
+      }
+      touristSocketService.requestSafetyScoreUpdate();
+
       try {
         const recipients = [
           state.authorityPhone,
@@ -304,7 +317,7 @@ export default function PanicActions({
         ].filter(Boolean);
         if (recipients.length) {
           const message = buildSmsMessage(label);
-          console.log('[PanicActions] Sending SOS SMS', {
+          console.log("[PanicActions] Sending SOS SMS", {
             recipientsCount: recipients.length,
             firstRecipient: recipients[0],
           });
@@ -312,16 +325,16 @@ export default function PanicActions({
             recipients,
             message,
           });
-          console.log('[PanicActions] SMS send result', smsRes);
+          console.log("[PanicActions] SMS send result", smsRes);
           if (!smsRes.ok) {
-            console.log('[PanicActions] SMS send failed, queueing for retry');
+            console.log("[PanicActions] SMS send failed, queueing for retry");
             await queueSMS({
               payload: { recipients, message },
             });
           }
         }
       } catch (e) {
-        console.warn('[PanicActions] SMS send threw', e);
+        console.warn("[PanicActions] SMS send threw", e);
       }
 
       setSnack({ visible: true, msg: "Alert sent: " + label });

@@ -9,8 +9,8 @@ import Constants from "expo-constants";
 export const SERVER_URL =
   Constants.expoConfig?.extra?.SERVER_URL ||
   process.env.SERVER_URL ||
-  // "http://192.168.1.22:5000"; // Your computer's local IP
-"https://smart-tourist-safety-app-backend-1.onrender.com";
+  "http://10.171.138.44:5000"; // Your computer's local IP
+// "https://smart-tourist-safety-app-backend-1.onrender.com";
 
 // AI model URLs for getting safety score predictions
 export const GEO_MODEL_URL =

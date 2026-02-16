@@ -71,6 +71,7 @@ class TouristSocketService {
   private isConnected: boolean = false;
   private touristId: string | null = null;
   private locationUpdateInterval: NodeJS.Timeout | null = null;
+  private listeners: Record<string, Function[]> = {};
 
   /**
    * Initialize and connect to the socket server
@@ -113,6 +114,12 @@ class TouristSocketService {
         touristId: this.touristId,
         location: initialLocation,
       });
+    });
+
+    // Handle risk grid updates
+    this.socket.on("riskGridUpdated", (gridData: any) => {
+      console.log(`Risk grid update broadcasted: ${gridData.gridId}`);
+      this.emit("riskGridUpdated", gridData);
     });
 
     // Debug: Log all incoming events
@@ -246,6 +253,21 @@ class TouristSocketService {
   }
 
   /**
+   * Request immediate safety score recalculation from backend
+   * This should be called after critical events like SOS triggers or incident reports
+   * to get immediate reflection in the safety score instead of waiting for the periodic update
+   */
+  requestSafetyScoreUpdate() {
+    if (!this.socket || !this.isConnected) {
+      console.warn("Socket not connected, cannot request safety score update");
+      return;
+    }
+
+    console.log("🔄 Requesting immediate safety score update from backend");
+    this.socket.emit("requestSafetyScoreUpdate");
+  }
+
+  /**
    * Start periodic location updates (every 45 seconds)
    * @param {function} getLocationFunc - Async function that returns current location coords
    */
@@ -308,6 +330,32 @@ class TouristSocketService {
    */
   isInitialized() {
     return this.socket !== null;
+  }
+
+  /**
+   * Register listener for internal service events
+   */
+  on(event: string, callback: Function) {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(callback);
+
+    // Return cleanup function
+    return () => {
+      this.listeners[event] = this.listeners[event].filter(
+        (cb) => cb !== callback,
+      );
+    };
+  }
+
+  /**
+   * Emit internal service event
+   */
+  private emit(event: string, data: any) {
+    if (this.listeners[event]) {
+      this.listeners[event].forEach((cb) => cb(data));
+    }
   }
 }
 

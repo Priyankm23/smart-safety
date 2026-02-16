@@ -168,6 +168,7 @@ export default function DashboardScreen({ navigation }: any) {
   // --- Socket Logic ---
   const [alerts, setAlerts] = useState<TouristAlert[]>([]);
   const [socketConnected, setSocketConnected] = useState(false);
+  const locationSubRef = useRef<Location.LocationSubscription | null>(null);
 
   // Function to get current location for periodic updates
   const getLocationForUpdates = async () => {
@@ -184,6 +185,8 @@ export default function DashboardScreen({ navigation }: any) {
   };
 
   useEffect(() => {
+    let statusInterval: NodeJS.Timeout | null = null;
+
     const initializeSocket = async () => {
       const touristId = state.user?.touristId || state.user?.id || "guest";
 
@@ -200,11 +203,40 @@ export default function DashboardScreen({ navigation }: any) {
 
       touristSocket.connect(touristId, coords);
 
-      // Start periodic location updates (every 45 seconds)
-      touristSocket.startPeriodicLocationUpdates(getLocationForUpdates);
+      // Start real-time location tracking for safety score updates
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === "granted") {
+          console.log(
+            "📍 Starting real-time location tracking for safety score",
+          );
+          const sub = await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.High,
+              timeInterval: 5000, // Check every 5 seconds
+              distanceInterval: 100, // Update every 100 meters
+            },
+            (loc) => {
+              console.log("📍 Location changed, sending update to backend");
+              // Update global context so map updates immediately
+              setCurrentLocation(loc);
+
+              touristSocket.updateLocation({
+                lat: loc.coords.latitude,
+                lng: loc.coords.longitude,
+              });
+            },
+          );
+          locationSubRef.current = sub;
+        }
+      } catch (e) {
+        console.log("Error starting location watch", e);
+        // Fallback to periodic if watch fails
+        touristSocket.startPeriodicLocationUpdates(getLocationForUpdates);
+      }
 
       // Check connection status periodically
-      const statusInterval = setInterval(() => {
+      statusInterval = setInterval(() => {
         setSocketConnected(touristSocket.getConnectionStatus());
       }, 2000);
 
@@ -213,15 +245,10 @@ export default function DashboardScreen({ navigation }: any) {
         handleIncomingAlert(alertData);
       });
 
-      // SafetyScore update listener is handled by SafetyScore component
-      // to update the UI directly. We don't need a duplicate listener here.
-
       // Listen for safety score alerts
       touristSocket.onSafetyScoreAlert((alertData) => {
         handleSafetyScoreAlert(alertData);
       });
-
-      return () => clearInterval(statusInterval);
     };
 
     if (state.user) {
@@ -229,6 +256,13 @@ export default function DashboardScreen({ navigation }: any) {
     }
 
     return () => {
+      if (locationSubRef.current) {
+        locationSubRef.current.remove();
+        locationSubRef.current = null;
+      }
+      if (statusInterval) {
+        clearInterval(statusInterval);
+      }
       touristSocket.disconnect();
     };
   }, [state.user]);
