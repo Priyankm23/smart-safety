@@ -6,6 +6,7 @@ import Animated, {
   withTiming,
   Easing
 } from 'react-native-reanimated';
+import { AlertTriangle, MapPin, Shield } from 'lucide-react-native';
 
 interface LegendBottomSheetProps {
   isExpanded: boolean;
@@ -42,10 +43,7 @@ export default function LegendBottomSheet({
   // Animation - slide up/down
   const translateY = useSharedValue(EXPANDED_HEIGHT);
 
-  console.log('[LegendBottomSheet] Component rendered, isExpanded:', isExpanded, 'counts:', { dangerZoneCount, riskGridCount, geofenceCount });
-
   useEffect(() => {
-    console.log('[LegendBottomSheet] isExpanded changed to:', isExpanded);
     translateY.value = withTiming(isExpanded ? 0 : EXPANDED_HEIGHT, {
       duration: 300,
       easing: Easing.out(Easing.ease),
@@ -70,20 +68,20 @@ export default function LegendBottomSheet({
       </TouchableOpacity>
 
       {/* Title */}
-      <Text style={styles.sectionTitle}>📊 Map Legend</Text>
+
 
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Statistics Grid */}
             <View style={styles.statsContainer}>
-              <View style={[styles.statCard, { borderLeftColor: THEME.danger }]}>
+              <View style={styles.statCard}>
                 <Text style={styles.statNumber}>{dangerZoneCount}</Text>
                 <Text style={styles.statLabel}>Danger Zones</Text>
               </View>
-              <View style={[styles.statCard, { borderLeftColor: THEME.risk }]}>
+              <View style={styles.statCard}>
                 <Text style={styles.statNumber}>{riskGridCount}</Text>
                 <Text style={styles.statLabel}>Risk Grids</Text>
               </View>
-              <View style={[styles.statCard, { borderLeftColor: THEME.geofence }]}>
+              <View style={styles.statCard}>
                 <Text style={styles.statNumber}>{geofenceCount}</Text>
                 <Text style={styles.statLabel}>Geofences</Text>
               </View>
@@ -95,8 +93,8 @@ export default function LegendBottomSheet({
 
               {/* Danger Zone */}
               <View style={styles.legendItem}>
-                <View style={[styles.iconCircle, { backgroundColor: '#fee2e2' }]}>
-                  <Text style={styles.iconEmoji}>⚠️</Text>
+                <View style={[styles.iconCircle, { backgroundColor: '#fee2e2' }]}> 
+                  <AlertTriangle size={22} color={THEME.danger} />
                 </View>
                 <View style={styles.legendText}>
                   <Text style={styles.legendTitle}>Danger Zones</Text>
@@ -109,8 +107,8 @@ export default function LegendBottomSheet({
 
               {/* Risk Grid */}
               <View style={styles.legendItem}>
-                <View style={[styles.iconCircle, { backgroundColor: '#fef3c7' }]}>
-                  <Text style={styles.iconEmoji}>📍</Text>
+                <View style={[styles.iconCircle, { backgroundColor: '#fef3c7' }]}> 
+                  <MapPin size={22} color={THEME.risk} />
                 </View>
                 <View style={styles.legendText}>
                   <Text style={styles.legendTitle}>Risk Grids</Text>
@@ -123,8 +121,8 @@ export default function LegendBottomSheet({
 
               {/* Geofence */}
               <View style={styles.legendItem}>
-                <View style={[styles.iconCircle, { backgroundColor: '#dbeafe' }]}>
-                  <Text style={styles.iconEmoji}>🛡️</Text>
+                <View style={[styles.iconCircle, { backgroundColor: '#dbeafe' }]}> 
+                  <Shield size={22} color={THEME.geofence} />
                 </View>
                 <View style={styles.legendText}>
                   <Text style={styles.legendTitle}>Geofences</Text>
@@ -223,7 +221,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
     padding: 12,
-    borderLeftWidth: 4,
     alignItems: 'center',
   },
   statNumber: {

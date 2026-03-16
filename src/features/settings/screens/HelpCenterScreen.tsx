@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { Text, List } from 'react-native-paper';
-import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 

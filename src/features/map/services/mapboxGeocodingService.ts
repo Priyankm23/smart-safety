@@ -85,8 +85,6 @@ export async function searchLocation(
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?${params}`;
 
   try {
-    console.log('[GeocodingAPI] Searching for:', query);
-    
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -97,7 +95,6 @@ export async function searchLocation(
 
     const data: GeocodingResponse = await response.json();
 
-    console.log('[GeocodingAPI] Found', data.features.length, 'result(s)');
     return data.features;
 
   } catch (error) {

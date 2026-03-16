@@ -179,22 +179,12 @@ export default function CreateGroupItineraryModal({
 
     setSaving(true);
     try {
-      console.log("📤 Sending CREATE GROUP request to /api/group/create");
-      console.log("Request body:", {
-        groupName: groupName.trim(),
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        itinerary: days,
-      });
-      
       const result = await createGroup({
         groupName: groupName.trim(),
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         itinerary: days,
       });
-
-      console.log("📥 CREATE GROUP response:", result);
 
       if (result.ok) {
         // Reset form

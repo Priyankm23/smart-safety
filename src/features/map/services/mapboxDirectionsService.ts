@@ -116,8 +116,6 @@ export async function fetchDirections(
   const url = `https://api.mapbox.com/directions/v5/${profileString}/${coordinates}?${params}`;
 
   try {
-    console.log('[DirectionsAPI] Fetching route:', { origin, destination, profile });
-
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -143,7 +141,6 @@ export async function fetchDirections(
       throw new Error('No routes found');
     }
 
-    console.log('[DirectionsAPI] Found', data.routes.length, 'route(s)');
     return data;
 
   } catch (error) {
@@ -198,8 +195,6 @@ export async function fetchDirectionsForWaypoints(
   const url = `https://api.mapbox.com/directions/v5/${profileString}/${coordinatesParam}?${params}`;
 
   try {
-    console.log('[DirectionsAPI] Fetching waypoint route:', { count: coordinates.length, profile });
-
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -224,7 +219,6 @@ export async function fetchDirectionsForWaypoints(
       throw new Error('No routes found');
     }
 
-    console.log('[DirectionsAPI] Found', data.routes.length, 'route(s)');
     return data;
   } catch (error) {
     console.error('[DirectionsAPI] Fetch error:', error);

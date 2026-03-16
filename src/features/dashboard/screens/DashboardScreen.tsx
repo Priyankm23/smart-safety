@@ -15,20 +15,14 @@ import touristSocket, {
   TouristAlert,
   SafetyScoreAlert,
 } from "../../../services/touristSocketService";
-import * as Notifications from "expo-notifications";
 import * as Haptics from "expo-haptics";
-import { Audio } from "expo-av";
+import {
+  configureNotificationHandler,
+  scheduleNotification,
+} from "../../../utils/notificationsCompat";
 
 // Configure notifications for critical alerts
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    priority: Notifications.AndroidNotificationPriority.MAX,
-  }),
-});
+configureNotificationHandler();
 
 export default function DashboardScreen({ navigation }: any) {
   const { state } = useApp();
@@ -51,7 +45,7 @@ export default function DashboardScreen({ navigation }: any) {
             setGroupData(data.data);
           }
         } catch (e) {
-          console.log("Failed to fetch group dashboard", e);
+          console.error("Failed to fetch group dashboard:", e);
         }
       }
     };
@@ -64,7 +58,6 @@ export default function DashboardScreen({ navigation }: any) {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          console.log("Location permission denied");
           return;
         }
 
@@ -179,7 +172,7 @@ export default function DashboardScreen({ navigation }: any) {
         return { lat: loc.coords.latitude, lng: loc.coords.longitude };
       }
     } catch (e) {
-      console.log("Error getting location for update", e);
+      console.error("Error getting location:", e);
     }
     return null;
   };
@@ -188,7 +181,7 @@ export default function DashboardScreen({ navigation }: any) {
     let statusInterval: NodeJS.Timeout | null = null;
 
     const initializeSocket = async () => {
-      const touristId = state.user?.touristId || state.user?.id || "guest";
+      const touristId = state.user?.touristId || "guest";
 
       let coords = { lat: 0, lng: 0 };
       try {
@@ -198,7 +191,7 @@ export default function DashboardScreen({ navigation }: any) {
           coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
         }
       } catch (e) {
-        console.log("Error getting location", e);
+        console.error("Error getting location:", e);
       }
 
       touristSocket.connect(touristId, coords);
@@ -282,7 +275,7 @@ export default function DashboardScreen({ navigation }: any) {
 
     // Function to send notification
     const sendNotification = async () => {
-      await Notifications.scheduleNotificationAsync({
+      await scheduleNotification({
         content: {
           title: `🚨 ${alertData.title}`,
           body: alertData.message,
@@ -315,8 +308,6 @@ export default function DashboardScreen({ navigation }: any) {
   };
 
   const handleSafetyScoreAlert = async (alertData: SafetyScoreAlert) => {
-    console.log("⚠️ Safety score alert:", alertData);
-
     // Haptic feedback for critical changes
     if (
       alertData.changeType === "critical_threshold" ||
@@ -326,7 +317,7 @@ export default function DashboardScreen({ navigation }: any) {
     }
 
     // Show notification
-    await Notifications.scheduleNotificationAsync({
+    await scheduleNotification({
       content: {
         title:
           alertData.changeType === "significant_drop"
@@ -347,7 +338,7 @@ export default function DashboardScreen({ navigation }: any) {
           { text: "Dismiss", style: "cancel" },
           {
             text: "View Details",
-            onPress: () => console.log("View safety details"),
+            onPress: () => {},
           },
         ],
       );
@@ -376,13 +367,7 @@ export default function DashboardScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Avatar.Text
-            size={48}
-            label={getUserInitials()}
-            style={[styles.avatar, { backgroundColor: getAvatarColor() }]}
-            labelStyle={styles.avatarLabel}
-          />
-          <View style={styles.headerContent}>
+          <View style={styles.headerContentFull}>
             <Text style={styles.greetingText}>{getGreeting()},</Text>
             <Text style={styles.userName}>{getUserName()}</Text>
             <View style={styles.locationRow}>
@@ -524,6 +509,10 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     flex: 1,
+  },
+  headerContentFull: {
+    flex: 1,
+    marginLeft: 0,
   },
   greetingText: {
     fontSize: 13,

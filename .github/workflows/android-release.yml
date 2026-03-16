@@ -69,6 +69,10 @@ jobs:
       GROQ_MODEL: ${{ secrets.GROQ_MODEL }}
       WEATHERAPI_KEY: ${{ secrets.WEATHERAPI_KEY }}
       OPENWEATHERMAP_KEY: ${{ secrets.OPENWEATHERMAP_KEY }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+  
     steps:
       - name: Checkout
         uses: actions/checkout@v4

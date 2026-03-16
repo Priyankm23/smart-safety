@@ -253,24 +253,6 @@ export async function fetchDynamicGeofences(
     // Merge all zones with priority order (danger zones first, then grids, then geofences)
     const allZones = [...dangerZones, ...riskGrids, ...filteredGeofences]
 
-    // Log itinerary geofences separately for debugging
-    const itineraryGeofencesFromApi = data.geofences?.filter((f: any) => f.sourceType === 'itinerary') || []
-    
-    console.log(`Loaded ${allZones.length} total zones from server:`)
-    console.log(`  - ${dangerZones.length} danger zones`)
-    console.log(`  - ${riskGrids.length} risk grids`)
-    console.log(`  - ${filteredGeofences.length} geofences (after day-wise filtering)`)
-    if (itineraryGeofencesFromApi.length > 0) {
-      console.log(`  - ${itineraryGeofencesFromApi.length} itinerary geofences from API`)
-      console.log(`  - ${todayItineraryGeofences.length} itinerary geofences for today`)
-      // Group by day for better visibility
-      const byDay: Record<number, number> = {}
-      itineraryGeofencesFromApi.forEach((f: any) => {
-        byDay[f.dayNumber] = (byDay[f.dayNumber] || 0) + 1
-      })
-      console.log(`    API breakdown by day:`, byDay)
-    }
-
     return allZones
   } catch (error: any) {
     console.error('Failed to fetch geofences:', error?.message || error)

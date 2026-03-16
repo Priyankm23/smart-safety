@@ -333,6 +333,9 @@ export const generateMapHTML = (accessToken?: string): string => {
            let waypointMarkers = [];
            let currentWaypoints = [];
            let userAccuracySourceId = 'user-accuracy';
+           let waypointSourceId = 'route-waypoints-source';
+           let waypointCircleLayerId = 'route-waypoints-circle';
+           let waypointLabelLayerId = 'route-waypoints-label';
 
            // Store route data to handle clicks
            let currentRoutesData = [];
@@ -605,6 +608,83 @@ export const generateMapHTML = (accessToken?: string): string => {
              // or use a fixed set source 'routes-source'
           }
 
+          function getEmptyFeatureCollection() {
+              return { type: 'FeatureCollection', features: [] };
+          }
+
+          function ensureWaypointLayers() {
+              if (!map.getSource(waypointSourceId)) {
+                  map.addSource(waypointSourceId, {
+                      type: 'geojson',
+                      data: getEmptyFeatureCollection()
+                  });
+              }
+
+              if (!map.getLayer(waypointCircleLayerId)) {
+                  map.addLayer({
+                      id: waypointCircleLayerId,
+                      type: 'circle',
+                      source: waypointSourceId,
+                      paint: {
+                          'circle-color': [
+                              'match',
+                              ['get', 'kind'],
+                              'start', '#16a34a',
+                              'end', '#dc2626',
+                              '#2563eb'
+                          ],
+                          'circle-radius': [
+                              'interpolate', ['linear'], ['zoom'],
+                              8, 10,
+                              12, 12,
+                              16, 14
+                          ],
+                          'circle-stroke-color': '#ffffff',
+                          'circle-stroke-width': 2,
+                          'circle-opacity': 1,
+                          'circle-pitch-alignment': 'map',
+                          'circle-pitch-scale': 'map'
+                      }
+                  });
+              }
+
+              if (!map.getLayer(waypointLabelLayerId)) {
+                  map.addLayer({
+                      id: waypointLabelLayerId,
+                      type: 'symbol',
+                      source: waypointSourceId,
+                      layout: {
+                          'text-field': ['get', 'label'],
+                          'text-size': [
+                              'interpolate', ['linear'], ['zoom'],
+                              8, 10,
+                              12, 11,
+                              16, 12
+                          ],
+                          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                          'text-allow-overlap': true,
+                          'text-ignore-placement': true,
+                          'text-anchor': 'center',
+                          'text-offset': [0, 0],
+                          'text-pitch-alignment': 'map',
+                          'text-rotation-alignment': 'map'
+                      },
+                      paint: {
+                          'text-color': '#ffffff',
+                          'text-halo-color': 'rgba(0, 0, 0, 0.08)',
+                          'text-halo-width': 0.5
+                      }
+                  });
+              }
+          }
+
+          function clearWaypointData() {
+              const source = map.getSource(waypointSourceId);
+              if (source) {
+                  source.setData(getEmptyFeatureCollection());
+              }
+          }
+
           // Handle zone clicks with overlap detection
           function handleZoneClick(e) {
               // Query all features at the click point
@@ -754,14 +834,10 @@ export const generateMapHTML = (accessToken?: string): string => {
                           severityPercent = ((reason.severity || 0) * 100).toFixed(0);
                       }
                       
-                      // Treat severity value directly as Safety Score based on user requirement
-                      // User expects 100 -> Green, 40 -> Orange, 0 -> Red
-                      const safetyScoreDisplay = Number(severityPercent);
-                      
-                      // Color based on Safety Score (High = Green, Low = Red)
-                      let severityColor = '#ef4444'; // default red (low safety)
-                      if (safetyScoreDisplay >= 70) severityColor = '#22c55e'; // Green
-                      else if (safetyScoreDisplay >= 40) severityColor = '#f97316'; // Orange
+                      // Color based on severity
+                      let severityColor = '#4ade80';
+                      if (severityPercent > 70) severityColor = '#ef4444';
+                      else if (severityPercent > 40) severityColor = '#f97316';
                       
                       html += \`
                           <div style="background: #f9fafb; padding: 8px; margin-bottom: 6px; border-radius: 6px; border-left: 3px solid \${severityColor};">
@@ -772,7 +848,7 @@ export const generateMapHTML = (accessToken?: string): string => {
                                       \${reason.eventType ? '<div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">Type: ' + reason.eventType + '</div>' : ''}
                                   </div>
                                   <div style="background: \${severityColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; margin-left: 8px;">
-                                      \${safetyScoreDisplay}%
+                                      \${severityPercent}%
                                   </div>
                               </div>
                           </div>
@@ -867,10 +943,24 @@ export const generateMapHTML = (accessToken?: string): string => {
                 switch (data.type) {
                     case 'updateLocation':
                         updateLocation(data.longitude, data.latitude, data.accuracy || 0, data.zoomLevel);
+                        updateLocation(
+                            data.longitude,
+                            data.latitude,
+                            data.accuracy || 0,
+                            data.zoomLevel,
+                            !!data.forceCenter
+                        );
                         break;
                     case 'setLocation':
                         if (data.location) {
                             updateLocation(data.location.longitude, data.location.latitude, data.location.accuracy || 0, 14);
+                            updateLocation(
+                                data.location.longitude,
+                                data.location.latitude,
+                                data.location.accuracy || 0,
+                                data.zoomLevel || 14,
+                                !!data.forceCenter
+                            );
                         }
                         break;
                     case 'setGeoFences':
@@ -1118,10 +1208,17 @@ export const generateMapHTML = (accessToken?: string): string => {
               // Clear previous markers
               waypointMarkers.forEach(m => m.remove());
               waypointMarkers = [];
+              if (!Array.isArray(waypoints) || waypoints.length === 0) {
+                  clearWaypointData();
+                  return;
+              }
 
               if (!Array.isArray(waypoints) || waypoints.length === 0) return;
+              ensureWaypointLayers();
+              const features = [];
 
               waypoints.forEach((wp) => {
+              waypoints.forEach((wp, idx) => {
                   if (!Number.isFinite(wp?.longitude) || !Number.isFinite(wp?.latitude)) return;
 
                   let el;
@@ -1145,7 +1242,30 @@ export const generateMapHTML = (accessToken?: string): string => {
                     .addTo(map);
 
                   waypointMarkers.push(marker);
+                  const kind = wp.kind === 'start' || wp.kind === 'end' ? wp.kind : 'stop';
+                  const label = kind === 'start'
+                      ? 'S'
+                      : kind === 'end'
+                          ? 'E'
+                          : (wp.label ? String(wp.label) : String(idx + 1));
+
+                  features.push({
+                      type: 'Feature',
+                      geometry: {
+                          type: 'Point',
+                          coordinates: [wp.longitude, wp.latitude]
+                      },
+                      properties: { kind, label }
+                  });
               });
+
+              const source = map.getSource(waypointSourceId);
+              if (source) {
+                  source.setData({
+                      type: 'FeatureCollection',
+                      features
+                  });
+              }
 
                             // If waypoints include an explicit end, drop destinationMarker to avoid duplicate red pins
                             if (waypoints.some(wp => wp.kind === 'end') && destinationMarker) {
@@ -1165,6 +1285,7 @@ export const generateMapHTML = (accessToken?: string): string => {
               }
               waypointMarkers.forEach(m => m.remove());
               waypointMarkers = [];
+              clearWaypointData();
           }
 
           function createLucidePinMarker(kind, text) {
@@ -1194,6 +1315,7 @@ export const generateMapHTML = (accessToken?: string): string => {
           window.addEventListener('message', handleMessageEvent);
 
            function updateLocation(lng, lat, accuracy, zoom) {
+           function updateLocation(lng, lat, accuracy, zoom, forceCenter) {
                if (!map) return;
                
                userLocation = { lng, lat, accuracy };
@@ -1218,9 +1340,10 @@ export const generateMapHTML = (accessToken?: string): string => {
               // FlyTo on first load only
               if (isFirstLoad) {
                 map.flyTo({ center: [lng, lat], zoom: zoom || 14 });
-              } else {
-                map.easeTo({ center: [lng, lat], zoom: zoom || map.getZoom() });
               }
+                            if (isFirstLoad || forceCenter) {
+                                map.flyTo({ center: [lng, lat], zoom: zoom || 14 });
+                            }
 
                             // Update accuracy ring if we have accuracy in meters
                             try {
@@ -1537,6 +1660,7 @@ export const generateMapHTML = (accessToken?: string): string => {
                           color = '#f59e0b'; // Medium: Orange
                       } else if (riskLevel.includes('low')) {
                           color = '#22c55e'; // Low: Green
+                          color = '#3b82f6'; // Low: Blue
                       }
                       
                       // Override color for specific zone types
@@ -1544,6 +1668,12 @@ export const generateMapHTML = (accessToken?: string): string => {
                       if (zoneType === 'geofence') {
                           color = '#3b82f6'; // Blue for tourist destinations
                       }
+                  }
+                  
+                  // Force itinerary geofences to blue regardless of visualStyle.color
+                  const zoneType = vs.zoneType || '';
+                  if (zoneType === 'itinerary_geofence') {
+                      color = '#3b82f6'; // Blue for itinerary geofences
                   }
                   
                   return {
@@ -1581,6 +1711,8 @@ export const generateMapHTML = (accessToken?: string): string => {
               return { 
                   fillColor: '#22c55e', fillOpacity: 0.2, fillPattern: 'solid',
                   borderColor: '#22c55e', borderWidth: 2, borderStyle: 'solid'
+                  fillColor: '#3b82f6', fillOpacity: 0.2, fillPattern: 'solid',
+                  borderColor: '#3b82f6', borderWidth: 2, borderStyle: 'solid'
               };
           }
           

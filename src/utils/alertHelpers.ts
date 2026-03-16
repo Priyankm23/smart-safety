@@ -1,8 +1,12 @@
-import * as Notifications from 'expo-notifications'
 import * as Haptics from 'expo-haptics'
 import { Platform, Vibration } from 'react-native'
 import STORAGE_KEYS from '../constants/storageKeys'
 import { readJSON, writeJSON, remove } from './storage'
+import {
+  getNotificationPermissionStatus,
+  requestNotificationPermissionStatus,
+  scheduleNotification,
+} from './notificationsCompat'
 
 type EscalationState = {
   startedAt: number // ms epoch when user entered a high-risk state
@@ -20,10 +24,10 @@ let escalationTimer: any = null
 
 export async function ensureNotificationPermission(): Promise<boolean> {
   try {
-    const settings = await Notifications.getPermissionsAsync()
-    if (settings.granted) return true
-    const req = await Notifications.requestPermissionsAsync()
-    return !!req.granted
+    const settings = await getNotificationPermissionStatus()
+    if (settings === 'granted') return true
+    const req = await requestNotificationPermissionStatus()
+    return req === 'granted'
   } catch (e) {
     console.warn('notification permission check failed', e)
     return false
@@ -86,7 +90,7 @@ async function notifyOnce(title: string, body: string | undefined, vibrateMs: nu
 
     const ok = await ensureNotificationPermission()
     if (ok) {
-      await Notifications.scheduleNotificationAsync({
+      await scheduleNotification({
         content: { title, body: body || '', sound: cfg.sound },
         trigger: null,
       })

@@ -52,7 +52,6 @@ export default function ActivityNodeForm({ onAddNode }: Props) {
   };
 
   const handleLocationSearch = async () => {
-    console.log('[ActivityForm] search pressed', { query: locationSearch });
     if (!locationSearch.trim()) {
       showToast('Please enter a location to search');
       return;
@@ -81,7 +80,6 @@ export default function ActivityNodeForm({ onAddNode }: Props) {
         const location = data[0];
         setCoordinates([parseFloat(location.lon), parseFloat(location.lat)]);
         setAddress(location.display_name);
-        console.log('[ActivityForm] geocode success', { coords: [location.lon, location.lat] });
         showToast('Location found!');
       } else {
         console.warn('[ActivityForm] geocode empty result');
@@ -94,7 +92,6 @@ export default function ActivityNodeForm({ onAddNode }: Props) {
   };
 
   const handleAddActivity = () => {
-    console.log('[ActivityForm] add pressed', { activityName, hasCoords: !!coordinates });
     // Validation
     if (!activityName.trim()) {
       showToast('Please enter an activity name');
@@ -138,7 +135,6 @@ export default function ActivityNodeForm({ onAddNode }: Props) {
         mode="contained-tonal"
         icon="plus"
         onPress={() => {
-          console.log('[ActivityForm] open form');
           setShowForm(true);
         }}
         style={styles.addButton}
@@ -281,7 +277,6 @@ export default function ActivityNodeForm({ onAddNode }: Props) {
       <View style={styles.buttonRow}>
         <TouchableOpacity
           onPress={() => {
-            console.log('[ActivityForm] cancel');
             setShowForm(false);
             // Reset form
             setActivityName('');

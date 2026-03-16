@@ -71,7 +71,6 @@ class TouristSocketService {
   private isConnected: boolean = false;
   private touristId: string | null = null;
   private locationUpdateInterval: NodeJS.Timeout | null = null;
-  private listeners: Record<string, Function[]> = {};
 
   /**
    * Initialize and connect to the socket server
@@ -116,12 +115,6 @@ class TouristSocketService {
       });
     });
 
-    // Handle risk grid updates
-    this.socket.on("riskGridUpdated", (gridData: any) => {
-      console.log(`Risk grid update broadcasted: ${gridData.gridId}`);
-      this.emit("riskGridUpdated", gridData);
-    });
-
     // Debug: Log all incoming events
     if (this.socket.onAny) {
       this.socket.onAny((eventName, ...args) => {
@@ -132,6 +125,7 @@ class TouristSocketService {
     // Handle registration confirmation
     this.socket.on("registrationConfirmed", (data: any) => {
       console.log("✅ Registration confirmed:", data?.message);
+      // Registration confirmed silently
     });
 
     // Handle connection errors
@@ -193,6 +187,7 @@ class TouristSocketService {
     }
 
     // Define the wrapper function to log and call callback
+    // Define the wrapper function to call callback
     const listener = (data: SafetyScoreData) => {
       console.log("📊 ===== SAFETY SCORE UPDATE RECEIVED =====");
       console.log(
@@ -250,21 +245,6 @@ class TouristSocketService {
     this.socket.emit("updateTouristLocation", {
       location: location,
     });
-  }
-
-  /**
-   * Request immediate safety score recalculation from backend
-   * This should be called after critical events like SOS triggers or incident reports
-   * to get immediate reflection in the safety score instead of waiting for the periodic update
-   */
-  requestSafetyScoreUpdate() {
-    if (!this.socket || !this.isConnected) {
-      console.warn("Socket not connected, cannot request safety score update");
-      return;
-    }
-
-    console.log("🔄 Requesting immediate safety score update from backend");
-    this.socket.emit("requestSafetyScoreUpdate");
   }
 
   /**
@@ -330,32 +310,6 @@ class TouristSocketService {
    */
   isInitialized() {
     return this.socket !== null;
-  }
-
-  /**
-   * Register listener for internal service events
-   */
-  on(event: string, callback: Function) {
-    if (!this.listeners[event]) {
-      this.listeners[event] = [];
-    }
-    this.listeners[event].push(callback);
-
-    // Return cleanup function
-    return () => {
-      this.listeners[event] = this.listeners[event].filter(
-        (cb) => cb !== callback,
-      );
-    };
-  }
-
-  /**
-   * Emit internal service event
-   */
-  private emit(event: string, data: any) {
-    if (this.listeners[event]) {
-      this.listeners[event].forEach((cb) => cb(data));
-    }
   }
 }
 

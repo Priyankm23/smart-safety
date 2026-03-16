@@ -1,6 +1,7 @@
 import { View, StyleSheet, TouchableOpacity } from "react-native"
 import { Text } from "react-native-paper"
-import { Ionicons, MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons"
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons"
+import { AlertTriangle } from "lucide-react-native"
 import { useApp } from "../../../context/AppContext"
 
 interface QuickAccessItem {
@@ -31,7 +32,7 @@ export default function QuickAccessSection() {
             id: "contacts",
             title: "Contacts",
             subtitle: `${emergencyContactCount + 1} Active`,
-            icon: <MaterialIcons name="emergency" size={22} color="#dc2626" />,
+            icon: <AlertTriangle size={22} color="#dc2626" />,
             iconBgColor: "#fef2f2",
         },
     ]

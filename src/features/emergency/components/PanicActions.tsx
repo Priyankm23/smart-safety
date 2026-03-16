@@ -26,8 +26,15 @@ import { triggerSOS } from "../../../utils/api";
 import { queueSOS } from "../../../utils/offlineQueue";
 import { sendSMS } from "../../../utils/sms";
 import { queueSMS } from "../../../utils/smsQueue";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import touristSocketService from "../../../services/touristSocketService";
+import {
+  Heart,
+  Shield,
+  Truck,
+  Flame,
+  Megaphone,
+  ChevronRight,
+  Wifi,
+} from "lucide-react-native";
 
 interface PanicActionsProps {
   onSOSTriggered?: () => void;
@@ -98,7 +105,7 @@ export default function PanicActions({
 
   // False Alarm / Countdown State
   const [isCountingDown, setIsCountingDown] = useState(false);
-  const [countdown, setCountdown] = useState(5);
+  const [countdown, setCountdown] = useState(3);
   const countdownTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Selection State
@@ -179,7 +186,7 @@ export default function PanicActions({
     setCustomReason("");
     setModalVisible(true);
     setIsCountingDown(false);
-    setCountdown(5);
+    setCountdown(3);
   };
 
   const handleClose = () => {
@@ -193,14 +200,14 @@ export default function PanicActions({
   const cancelCountdown = () => {
     if (countdownTimer.current) clearTimeout(countdownTimer.current);
     setIsCountingDown(false);
-    setCountdown(5);
+    setCountdown(3);
   };
 
   // Trigger from the IMMEDIATE button (Critical)
   const handleImmediateTrigger = () => {
     // Start countdown instead of immediate trigger
     setIsCountingDown(true);
-    setCountdown(5); // 5 seconds to cancel
+    setCountdown(3); // 3 seconds to cancel
   };
 
   // Trigger from category flow
@@ -298,18 +305,6 @@ export default function PanicActions({
       console.log("[PanicActions] Triggering SOS:", label);
       await triggerSOS(currentToken, sosData);
 
-      // Force update location and request immediate safety score recalculation
-      console.log(
-        "[PanicActions] Requesting safety score update after SOS trigger",
-      );
-      if (currentLocation && currentLocation.coords) {
-        touristSocketService.updateLocation({
-          lat: currentLocation.coords.latitude,
-          lng: currentLocation.coords.longitude,
-        });
-      }
-      touristSocketService.requestSafetyScoreUpdate();
-
       try {
         const recipients = [
           state.authorityPhone,
@@ -331,6 +326,20 @@ export default function PanicActions({
             await queueSMS({
               payload: { recipients, message },
             });
+            if (
+              smsRes.reason === "permission_denied" ||
+              smsRes.reason === "permission_never_ask_again"
+            ) {
+              setSnack({
+                visible: true,
+                msg: "SMS permission blocked. Enable SMS in App Settings to auto-send SOS messages.",
+              });
+            } else if (smsRes.reason === "direct_module_unavailable") {
+              setSnack({
+                visible: true,
+                msg: "Android build update required. Reinstall dev build to enable auto SMS.",
+              });
+            }
           }
         }
       } catch (e) {
@@ -426,6 +435,13 @@ export default function PanicActions({
 
   // ---- RENDER HELPERS ----
 
+  const ICON_MAP: { [key: string]: any } = {
+    medical: Heart,
+    security: Shield,
+    accident: Truck,
+    fire: Flame,
+  };
+
   const renderCategorySelection = () => (
     <View style={styles.modalContent}>
       <Text style={styles.modalTitle}>Emergency Assistance</Text>
@@ -440,7 +456,7 @@ export default function PanicActions({
         activeOpacity={0.8}
       >
         <View style={styles.immediateIconContainer}>
-          <MaterialCommunityIcons name="broadcast" size={32} color="#FFFFFF" />
+          <Megaphone size={32} color="#FFFFFF" />
         </View>
         <View style={styles.immediateTextContainer}>
           <Text style={styles.immediateTitle}>SEND IMMEDIATE HELP</Text>
@@ -448,31 +464,29 @@ export default function PanicActions({
             Critical emergency • No details needed
           </Text>
         </View>
-        <MaterialCommunityIcons
-          name="chevron-right"
-          size={24}
-          color="#FFCDD2"
-        />
+        <ChevronRight size={24} color="#FFCDD2" />
       </TouchableOpacity>
 
       <Text style={styles.sectionHeader}>Or select a reason:</Text>
 
       <View style={styles.gridContainer}>
-        {SOS_CATEGORIES.map((cat) => (
-          <TouchableOpacity
-            key={cat.id}
-            style={[styles.categoryCard, { borderLeftColor: cat.color }]}
-            onPress={() => setSelectedCategory(cat.id)}
-          >
-            <MaterialCommunityIcons
-              name={cat.icon as any}
-              size={28}
-              color={cat.color}
-              style={{ marginBottom: 8 }}
-            />
-            <Text style={styles.categoryLabel}>{cat.label}</Text>
-          </TouchableOpacity>
-        ))}
+        {SOS_CATEGORIES.map((cat) => {
+          const IconComp = ICON_MAP[cat.id] || Shield;
+          return (
+            <TouchableOpacity
+              key={cat.id}
+              style={styles.categoryCard}
+              onPress={() => setSelectedCategory(cat.id)}
+            >
+              <IconComp
+                size={28}
+                color={cat.color}
+                style={{ marginBottom: 8 }}
+              />
+              <Text style={styles.categoryLabel}>{cat.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <Button mode="text" onPress={handleClose} style={styles.cancelButton}>
@@ -583,12 +597,7 @@ export default function PanicActions({
           onPress={handleSOSPress}
           activeOpacity={0.8}
         >
-          <MaterialCommunityIcons
-            name="wifi"
-            size={56}
-            color="white"
-            style={{ marginBottom: 8 }}
-          />
+          <Wifi size={56} color="white" style={{ marginBottom: 8 }} />
           <Text style={styles.sosCompactText}>SOS</Text>
         </TouchableOpacity>
       </View>
@@ -758,7 +767,6 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: "center",
     justifyContent: "center",
-    borderLeftWidth: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -772,7 +780,9 @@ const styles = StyleSheet.create({
     color: "#374151",
   },
   cancelButton: {
-    marginTop: 24,
+    marginTop: 0,
+    marginBottom: -12,
+    alignSelf: "center",
   },
 
   // SUB CATEGORY

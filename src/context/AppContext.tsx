@@ -35,15 +35,17 @@ import {
   createGroup as apiCreateGroup,
 } from "../utils/api";
 import * as Location from "expo-location";
-import * as Notifications from "expo-notifications";
 import { Buffer } from "buffer";
 import {
   SafetyEvent,
   sendSafetyLocationUpdate,
 } from "../services/safetyLocationService";
-import touristSocketService, {
-  SafetyScoreData,
-} from "../services/touristSocketService";
+import {
+  getNotificationPermissionStatus,
+  requestNotificationPermissionStatus,
+  scheduleNotification,
+} from "../utils/notificationsCompat";
+import * as Sentry from "@sentry/react-native";
 
 const decodeBase64 = (str: string): string => {
   return Buffer.from(str, "base64").toString("binary");
@@ -446,6 +448,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                     count: itinerary.length,
                   });
                 } catch (e) {}
+
+                // Set Sentry user context for error tracking
+                Sentry.setUser({
+                  id: userData.touristId,
+                  email: userData.email,
+                  username: userData.name,
+                  phone: userData.phone,
+                  role: userData.role,
+                });
               }
             }
           } catch (e: any) {
@@ -672,10 +683,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const hasNotificationPermission = async (): Promise<boolean> => {
       try {
-        const current = await Notifications.getPermissionsAsync();
-        if (current.status === "granted") return true;
-        const requested = await Notifications.requestPermissionsAsync();
-        return requested.status === "granted";
+        const current = await getNotificationPermissionStatus();
+        if (current === "granted") return true;
+        const requested = await requestNotificationPermissionStatus();
+        return requested === "granted";
       } catch (error) {
         console.warn(
           "[SafetyTracking] Notification permission check failed:",
@@ -757,7 +768,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             continue;
           }
 
-          await Notifications.scheduleNotificationAsync({
+          await scheduleNotification({
             content: {
               title: getSafetyNotificationTitle(event),
               body: event.message,
@@ -820,40 +831,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       clearInterval(dayChangeInterval);
-    };
-  }, [hydrated, state.user?.touristId]);
-
-  // Listen for real-time safety score updates
-  useEffect(() => {
-    // Only subscribe if we have a logged-in user with an ID
-    if (!hydrated || !state.user?.touristId) return;
-
-    console.log(
-      "[AppContext] Setting up safety score listener for user:",
-      state.user.touristId,
-    );
-
-    // Subscribe to safety score updates from socket
-    const unsubscribe = touristSocketService.onSafetyScoreUpdate(
-      (data: SafetyScoreData) => {
-        console.log(
-          "[AppContext] Received real-time safety score update:",
-          data.safetyScore,
-        );
-
-        // Update state with new score
-        setState((s) => ({
-          ...s,
-          computedSafetyScore: data.safetyScore,
-          // Also update the user object if present, to keep them in sync
-          user: s.user ? { ...s.user, safetyScore: data.safetyScore } : s.user,
-        }));
-      },
-    );
-
-    return () => {
-      console.log("[AppContext] Cleaning up safety score listener");
-      if (unsubscribe) unsubscribe();
     };
   }, [hydrated, state.user?.touristId]);
 
@@ -972,6 +949,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               trips,
             });
           } catch (e) {}
+
+          // Set Sentry user context for error tracking
+          Sentry.setUser({
+            id: userData.touristId,
+            email: userData.email,
+            username: userData.name,
+            phone: userData.phone,
+            role: userData.role,
+          });
+
           return { ok: true, message: "Login successful" };
         } catch (error: any) {
           // Check if this is a group member trying to login with email/password
@@ -1058,6 +1045,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             trips,
             contacts: contactsFromApi || s.contacts,
           }));
+
+          // Set Sentry user context for error tracking
+          Sentry.setUser({
+            id: userData.touristId,
+            email: userData.email,
+            username: userData.name,
+            phone: userData.phone,
+            role: userData.role,
+          });
 
           try {
             console.log("✅ 3-code login successful");
@@ -1191,6 +1187,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       async logout() {
         await remove(STORAGE_KEY);
         setState(defaultState);
+        // Clear Sentry user context on logout
+        Sentry.setUser(null);
       },
       async updateProfile(patch) {
         setState((s) => ({
@@ -1291,6 +1289,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                   "Failed to refresh geofences after solo itinerary update:",
                   geoErr,
                 );
+                console.warn("Failed to refresh geofences:", geoErr);
               }
             } else {
               console.log("[AppContext] No solo itinerary found");
@@ -1317,6 +1316,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 "[AppContext] Group dashboard failed, will use user itinerary:",
                 dashErr?.message,
               );
+              console.warn("Group dashboard fetch failed:", dashErr?.message);
             }
 
             if (groupItinerary && groupItinerary.length > 0) {
@@ -1348,6 +1348,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                   "Failed to refresh geofences after group itinerary fetch:",
                   geoErr,
                 );
+                console.warn("Failed to refresh geofences:", geoErr);
               }
             } else {
               // Fallback: use the user's own dayWiseItinerary

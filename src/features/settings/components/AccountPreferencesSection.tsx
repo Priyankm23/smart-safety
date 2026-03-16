@@ -3,7 +3,8 @@ import { useNavigation } from "@react-navigation/native"
 import { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { RootStackParamList } from "../../../navigation"
 import { Text, Switch, Menu, TextInput, Button } from "react-native-paper"
-import { Ionicons, MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons"
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons"
+import { Vibrate, Languages } from "lucide-react-native"
 import { useState, useEffect, useRef } from "react"
 import { useApp } from "../../../context/AppContext"
 import { getAlertConfig, saveAlertConfig, getAlertState, setGlobalMute } from "../../../utils/alertHelpers"
@@ -221,7 +222,7 @@ export default function AccountPreferencesSection() {
                 {/* Vibration */}
                 <View style={[styles.listItem, { paddingVertical: 5 }]}>
                     <View style={styles.listItemLeft}>
-                        <MaterialIcons name="vibration" size={22} color="#1e40af" />
+                        <Vibrate size={22} color="#1e40af" />
                         <Text style={styles.listItemText}>Vibration</Text>
                     </View>
                     <Switch
@@ -245,7 +246,7 @@ export default function AccountPreferencesSection() {
                                 onPress={openLanguageMenu}
                             >
                                 <View style={styles.listItemLeft}>
-                                    <MaterialIcons name="language" size={22} color="#1e40af" />
+                                    <Languages size={22} color="#1e40af" />
                                     <Text style={styles.listItemText}>Language</Text>
                                 </View>
                                 <View style={styles.valueContainer}>

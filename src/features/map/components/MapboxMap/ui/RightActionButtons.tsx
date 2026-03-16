@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface RightActionButtonsProps {
@@ -37,7 +37,7 @@ export default function RightActionButtons({
                         onPress={onCompassPress}
                         activeOpacity={0.85}
                     >
-                        <MaterialCommunityIcons name="navigation" size={20} color="#374151" />
+                        <MaterialCommunityIcons name="crosshairs-gps" size={20} color="#2563EB" />
                     </TouchableOpacity>
                 )}
 

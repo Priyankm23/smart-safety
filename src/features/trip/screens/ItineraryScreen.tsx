@@ -8,7 +8,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { BlurView } from "expo-blur"
 import { getGroupDashboard } from "../../../utils/api"
 
-export type FilterType = "all" | "upcoming" | "completed"
+export type FilterType = "current" | "upcoming" | "completed"
 
 import CreateGroupItineraryModal from "../components/CreateGroupItineraryModal"
 import EditGroupItineraryModal from "../components/EditGroupItineraryModal"
@@ -17,7 +17,7 @@ export default function ItineraryScreen({ navigation }: any) {
   const { state, updateTripsFromBackend } = useApp()
   const theme = useTheme()
   const itineraryListRef = useRef<{ openNew: () => void } | null>(null)
-  const [activeFilter, setActiveFilter] = useState<FilterType>("all")
+  const [activeFilter, setActiveFilter] = useState<FilterType>("current")
   const [loadingTrips, setLoadingTrips] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -27,16 +27,11 @@ export default function ItineraryScreen({ navigation }: any) {
 
   // Fetch trips for solo users
   useEffect(() => {
-    console.log('ItineraryScreen: Fetching trips...', 'token=', !!state.token, 'existing trips=', state.trips?.length);
     if (state.token) {
-      console.log('ItineraryScreen: Fetching trips for user...');
       setLoadingTrips(true);
       updateTripsFromBackend()
-        .then(() => {
-          console.log('ItineraryScreen: Trips fetched successfully, current count=', state.trips?.length);
-        })
         .catch((err) => {
-          console.log("Error fetching user trips", err);
+          console.error("Failed to fetch trips:", err);
         })
         .finally(() => {
           setLoadingTrips(false);
@@ -51,19 +46,17 @@ export default function ItineraryScreen({ navigation }: any) {
             }
           })
           .catch((err) => {
-            console.log("Error fetching group data", err);
+            console.error("Failed to fetch group data:", err);
           });
       }
     }
   }, [state.token]);
 
   const handleCreateGroupItinerary = () => {
-    console.log("➕ Opening Create Group Itinerary modal");
     setShowCreateModal(true);
   }
 
   const handleGroupCreated = () => {
-    console.log("✅ Group created successfully!");
     setShowCreateModal(false);
   }
 
@@ -86,7 +79,7 @@ export default function ItineraryScreen({ navigation }: any) {
   }
 
   const filters: { key: FilterType; label: string; icon: string }[] = [
-    { key: "all", label: "All", icon: "view-grid" },
+    { key: "current", label: "Current", icon: "calendar-today" },
     { key: "upcoming", label: "Upcoming", icon: "clock-outline" },
     { key: "completed", label: "Completed", icon: "check-circle-outline" },
   ]

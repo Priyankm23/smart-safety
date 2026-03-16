@@ -31,7 +31,15 @@
           "locationAlwaysAndWhenInUsePermission": "This app needs access to location to share your current location in emergency situations."
         }
       ],
-      "@rnmapbox/maps"
+      "@rnmapbox/maps",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "redrepter"
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true

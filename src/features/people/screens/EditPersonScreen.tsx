@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, TextInput, Keyboard, Alert } from 'react-native';
 import { Text, Menu } from 'react-native-paper';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { ArrowLeft, User, Calendar, Mail, Phone, Droplet, ChevronDown, Activity, AlertCircle, Stethoscope } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useApp } from '../../../context/AppContext';
 
@@ -84,7 +84,7 @@ export default function EditPersonScreen() {
                     onPress={() => navigation.goBack()}
                     style={styles.backButton}
                 >
-                    <Ionicons name="arrow-back" size={24} color="#1E293B" />
+                    <ArrowLeft size={24} color="#1E293B" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Edit Person</Text>
                 <TouchableOpacity 
@@ -103,7 +103,7 @@ export default function EditPersonScreen() {
                 {/* Personal Information */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="person" size={20} color="#3b82f6" />
+                        <User size={20} color="#3b82f6" />
                         <Text style={styles.sectionTitle}>Personal Information</Text>
                     </View>
 
@@ -125,7 +125,7 @@ export default function EditPersonScreen() {
                                     onChangeText={setDob}
                                     placeholder="MM/DD/YYYY"
                                 />
-                                <Ionicons name="calendar-outline" size={18} color="#9ca3af" style={styles.inputIcon} />
+                                <Calendar size={18} color="#9ca3af" style={styles.inputIcon} />
                             </View>
                         </View>
                         <View style={styles.halfField}>
@@ -150,7 +150,7 @@ export default function EditPersonScreen() {
                 {/* Contact Information */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="mail" size={20} color="#3b82f6" />
+                        <Mail size={20} color="#3b82f6" />
                         <Text style={styles.sectionTitle}>Contact Information</Text>
                     </View>
 
@@ -185,7 +185,7 @@ export default function EditPersonScreen() {
                 {/* Emergency Contact */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="call" size={20} color="#3b82f6" />
+                        <Phone size={20} color="#3b82f6" />
                         <Text style={styles.sectionTitle}>Emergency Contact</Text>
                     </View>
 
@@ -211,7 +211,7 @@ export default function EditPersonScreen() {
                 <View style={styles.emergencySection}>
                     <View style={styles.emergencyHeader}>
                         <View style={styles.emergencyIconContainer}>
-                            <MaterialCommunityIcons name="medical-bag" size={22} color="#fff" />
+                            <Stethoscope size={22} color="#fff" />
                         </View>
                         <Text style={styles.emergencyTitle}>Medical Information</Text>
                     </View>
@@ -230,9 +230,9 @@ export default function EditPersonScreen() {
                                                 onPress={openBloodMenu}
                                                 activeOpacity={0.7}
                                             >
-                                                <Ionicons name="water" size={18} color="#ef4444" />
+                                                <Droplet size={18} color="#ef4444" />
                                                 <Text style={styles.emergencyDropdownText}>{bloodGroup}</Text>
-                                                <Ionicons name="chevron-down" size={16} color="#6b7280" />
+                                                <ChevronDown size={16} color="#6b7280" />
                                             </TouchableOpacity>
                                         </View>
                                     }
@@ -255,7 +255,7 @@ export default function EditPersonScreen() {
                         <View style={styles.emergencyField}>
                             <Text style={styles.emergencyLabel}>Medical Conditions</Text>
                             <View style={styles.emergencyInputRow}>
-                                <Ionicons name="fitness" size={18} color="#f97316" />
+                                <Activity size={18} color="#f97316" />
                                 <TextInput
                                     style={styles.emergencyInput}
                                     value={medicalConditions}
@@ -269,7 +269,7 @@ export default function EditPersonScreen() {
                         <View style={[styles.emergencyField, { marginBottom: 0 }]}>
                             <Text style={styles.emergencyLabel}>Allergies</Text>
                             <View style={styles.emergencyInputRow}>
-                                <Ionicons name="alert-circle" size={18} color="#eab308" />
+                                <AlertCircle size={18} color="#eab308" />
                                 <TextInput
                                     style={styles.emergencyInput}
                                     value={allergies}

@@ -48,8 +48,6 @@ let currentPrimary: GeoFence | null = null
 
 export async function loadFences(userLat?: number, userLng?: number, userId?: string): Promise<GeoFence[]> {
   try {
-    console.log('🔍 loadFences called with userId:', userId)
-    
     // If userId is provided, skip cache and fetch fresh from server
     // This ensures user gets their personal itinerary geofences immediately
     const shouldBypassCache = !!userId
@@ -62,17 +60,15 @@ export async function loadFences(userLat?: number, userLng?: number, userId?: st
         states = {}
         fences.forEach(f => { states[f.id] = 'outside' })
         // Still try to refresh from server in background
-        console.log('📦 Using cached fences, refreshing from server in background')
         refreshFromServer(userLat, userLng, userId)
         return fences
       }
     } else {
-      console.log('⏩ Bypassing cache to fetch fresh data with userId:', userId)
+      // Bypassing cache for userId-specific fetch
     }
 
     // Try server API first
     try {
-      console.log('🌐 Fetching geofences from server with userId:', userId)
       const serverFences = await fetchDynamicGeofences(userLat, userLng, 5000, userId)
       if (serverFences && serverFences.length > 0) {
         fences = serverFences
@@ -80,7 +76,6 @@ export async function loadFences(userLat?: number, userLng?: number, userId?: st
         fences.forEach(f => { states[f.id] = 'outside' })
         // Cache for offline use
         try { await saveFences(fences) } catch (e) { /* ignore */ }
-        console.log(`✅ Loaded ${fences.length} geofences from server`)
         return fences
       }
     } catch (serverError) {
@@ -88,7 +83,6 @@ export async function loadFences(userLat?: number, userLng?: number, userId?: st
     }
 
     // Fallback: Load bundled JSON
-    console.log('Loading bundled geofences...')
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const data = require('../../../../assets/geofences-output.json')
     fences = data
@@ -109,7 +103,6 @@ export async function loadFences(userLat?: number, userLng?: number, userId?: st
 
     // Persist a cached copy for faster startup
     try { await saveFences(fences) } catch (e) { /* ignore */ }
-    console.log(`Loaded ${fences.length} bundled geofences`)
     return fences
   } catch (e) {
     console.error('Failed to load geofences:', e)
@@ -128,7 +121,6 @@ async function refreshFromServer(userLat?: number, userLng?: number, userId?: st
       states = {}
       fences.forEach(f => { states[f.id] = 'outside' })
       try { await saveFences(fences) } catch (e) { /* ignore */ }
-      console.log(`Background refresh: loaded ${fences.length} geofences from server`)
     }
   } catch (e) {
     // Silent fail for background refresh
@@ -276,7 +268,6 @@ export function getFences() {
 export function filterFencesByDistance(userLat: number, userLng: number, radiusKm: number = 15) {
   const { filterFencesByDistance: filterFn } = require('../../../utils/geofenceLogic')
   const filtered = filterFn(fences, userLat, userLng, radiusKm)
-  console.log(`Filtered to ${filtered.length} fences within ${radiusKm}km of user location`)
   return filtered
 }
 

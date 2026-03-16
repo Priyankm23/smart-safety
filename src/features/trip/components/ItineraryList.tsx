@@ -20,6 +20,7 @@ import {
   useTheme,
   Switch,
 } from "react-native-paper";
+import { useNavigation } from "@react-navigation/native";
 import { useApp } from "../../../context/AppContext";
 import { t } from "../../../context/translations";
 import { LinearGradient } from "expo-linear-gradient";
@@ -96,9 +97,30 @@ interface ItineraryListProps {
   loading?: boolean;
 }
 
+type TripItem = {
+  id: string;
+  title: string;
+  date: string;
+  notes?: string;
+  dayWiseItinerary?: Array<{
+    dayNumber: number;
+    date: string;
+    nodes: Array<{
+      type: string;
+      name: string;
+      locationName: string;
+      lat: number;
+      lng: number;
+      scheduledTime: string;
+      activityDetails?: string;
+    }>;
+  }>;
+};
+
 const ItineraryList = forwardRef<{ openNew: () => void }, ItineraryListProps>(
-  ({ filter = "all", loading = false }, ref) => {
+  ({ filter = "current", loading = false }, ref) => {
     const { state, addTrip, updateTrip, removeTrip, updateTripsFromBackend } = useApp();
+    const navigation = useNavigation();
     const theme = useTheme();
     const [visible, setVisible] = useState(false);
     const [isExtending, setIsExtending] = useState(false);
@@ -118,10 +140,6 @@ const ItineraryList = forwardRef<{ openNew: () => void }, ItineraryListProps>(
 
     // Check if user is a group member (read-only access)
     const isGroupMember = state.user?.role === 'group-member';
-    
-    // Debug log
-    console.log('[ItineraryList] User data:', JSON.stringify(state.user, null, 2));
-    console.log('[ItineraryList] User role:', state.user?.role, 'isGroupMember:', isGroupMember);
 
       useImperativeHandle(ref, () => ({
       openNew: () => {
@@ -136,31 +154,49 @@ const ItineraryList = forwardRef<{ openNew: () => void }, ItineraryListProps>(
       },
     }));
 
-      const openEdit = (id: string, ttitle: string, d: string, n?: string, dayWiseItinerary?: any[]) => {
-      console.log('[ItineraryList] openEdit called', { id, title: ttitle, date: d, hasDayWise: !!dayWiseItinerary });
-      setEditingId(id);
-      
-      // If trip has day-wise itinerary, use the detailed modal
-      if (dayWiseItinerary && dayWiseItinerary.length > 0) {
-        setEditingItinerary(dayWiseItinerary);
-        setShowDayWiseEditModal(true);
-      } else {
-        // Otherwise use simple modal
-        setIsExtending(false);
-        setTitle(ttitle);
-        // Format the date if it's an ISO string
-        try {
-          const dateObj = new Date(d);
-          setDate(dateObj.toISOString().split('T')[0]); // Store as YYYY-MM-DD
-        } catch (e) {
-          setDate(d);
+      const openEdit = (trip: TripItem) => {
+        if (state.user?.role === 'tour-admin') {
+          const itinerary = Array.isArray(trip.dayWiseItinerary) ? trip.dayWiseItinerary : [];
+          const range = getTripDateRange(trip);
+          const start = range.startDate || new Date(itinerary[0]?.date || trip.date || new Date().toISOString());
+          const end = range.endDate || new Date(itinerary[itinerary.length - 1]?.date || start);
+          const dayMs = 1000 * 60 * 60 * 24;
+          const diffDays = Math.ceil((end.getTime() - start.getTime()) / dayMs);
+          const tripDuration = itinerary.length > 0 ? itinerary.length : Math.max(1, diffDays || 0);
+
+          (navigation as any).navigate('BuildItinerary', {
+            tripDuration,
+            startDate: start.toISOString(),
+            returnDate: end.toISOString(),
+            touristId: state.user?.touristId || 'unknown',
+            initialItinerary: itinerary,
+          });
+          return;
         }
-        setEndDate("");
-        setNotes(n || "");
-        setNotifyAuthorities(false);
-        setVisible(true);
-      }
-    };
+
+        setEditingId(trip.id);
+        
+        // If trip has day-wise itinerary, use the detailed modal
+        if (trip.dayWiseItinerary && trip.dayWiseItinerary.length > 0) {
+          setEditingItinerary(trip.dayWiseItinerary);
+          setShowDayWiseEditModal(true);
+        } else {
+          // Otherwise use simple modal
+          setIsExtending(false);
+          setTitle(trip.title);
+          // Format the date if it's an ISO string
+          try {
+            const dateObj = new Date(trip.date);
+            setDate(dateObj.toISOString().split('T')[0]); // Store as YYYY-MM-DD
+          } catch (e) {
+            setDate(trip.date);
+          }
+          setEndDate("");
+          setNotes(trip.notes || "");
+          setNotifyAuthorities(false);
+          setVisible(true);
+        }
+      };
 
       const openExtend = (id: string, ttitle: string, d: string, n?: string) => {
       setEditingId(id);
@@ -267,6 +303,35 @@ const ItineraryList = forwardRef<{ openNew: () => void }, ItineraryListProps>(
       return today <= end;
     };
 
+    const isCurrent = (trip: { date?: string; dayWiseItinerary?: any[] }) => {
+      const { startDate, endDate } = getTripDateRange(trip);
+      if (!startDate || !endDate) return false;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      return today >= start && today <= end;
+    };
+
+    const isFuture = (trip: { date?: string; dayWiseItinerary?: any[] }) => {
+      const { startDate } = getTripDateRange(trip);
+      if (!startDate) return false;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      return start > today;
+    };
+
     const isPast = (trip: { date?: string; dayWiseItinerary?: any[] }) => {
       const { endDate } = getTripDateRange(trip);
       if (!endDate) return false;
@@ -286,34 +351,13 @@ const ItineraryList = forwardRef<{ openNew: () => void }, ItineraryListProps>(
 
     // Filter trips based on active filter
     const filteredTrips = state.trips.filter((trip) => {
-      if (filter === "all") return true;
-      if (filter === "upcoming") return isUpcoming(trip);
+      if (filter === "current") return isCurrent(trip);
+      if (filter === "upcoming") return isFuture(trip);
       if (filter === "completed") return isPast(trip);
       return true;
     });
 
-    // Log for debugging
-    console.log('ItineraryList: Total trips=', state.trips?.length || 0, 'Filtered=', filteredTrips.length, 'Filter=', filter, 'Loading=', loading);
-
-    const renderTripCard = (trip: {
-      id: string;
-      title: string;
-      date: string;
-      notes?: string;
-      dayWiseItinerary?: Array<{
-        dayNumber: number;
-        date: string;
-        nodes: Array<{
-          type: string;
-          name: string;
-          locationName: string;
-          lat: number;
-          lng: number;
-          scheduledTime: string;
-          activityDetails?: string;
-        }>;
-      }>;
-    }) => {
+    const renderTripCard = (trip: TripItem) => {
       const status = getStatus(trip);
       const imageUrl = getImageForDestination(trip.title);
 
@@ -413,7 +457,7 @@ const ItineraryList = forwardRef<{ openNew: () => void }, ItineraryListProps>(
               <View style={styles.cardActions}>
                 <TouchableOpacity
                   style={styles.editButton}
-                  onPress={() => openEdit(trip.id, trip.title, trip.date, trip.notes, trip.dayWiseItinerary)}
+                  onPress={() => openEdit(trip)}
                 >
                   <MaterialCommunityIcons
                     name="pencil-outline"
@@ -644,6 +688,9 @@ const ItineraryList = forwardRef<{ openNew: () => void }, ItineraryListProps>(
       );
     };
 
+    const showHistorySection = filter === "completed";
+    const primaryTrips = showHistorySection ? [] : filteredTrips;
+
     return (
       <View style={styles.container}>
         {loading ? (
@@ -673,7 +720,7 @@ const ItineraryList = forwardRef<{ openNew: () => void }, ItineraryListProps>(
 
             {/* Content */}
             <Text style={styles.emptyTitle}>
-              No trips {filter !== "all" ? filter : ""} yet
+              {filter === "current" ? "No current trips yet" : `No ${filter} trips yet`}
             </Text>
             <Text style={styles.emptySubtitle}>
               Plan your next adventure and stay safe{"\n"}with real-time safety updates
@@ -718,31 +765,12 @@ const ItineraryList = forwardRef<{ openNew: () => void }, ItineraryListProps>(
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
           >
-            {filteredTrips
-              .filter((t) => isUpcoming(t))
-              .map(renderTripCard)}
+            {primaryTrips.map(renderTripCard)}
 
-            {filteredTrips.some((t) => !isUpcoming(t)) && (
+            {showHistorySection && filteredTrips.length > 0 && (
               <View style={styles.historySection}>
-                <TouchableOpacity
-                  style={styles.historyHeader}
-                  onPress={() => setShowHistory(!showHistory)}
-                >
-                  <Text style={styles.historyTitle}>
-                    Past Trips (
-                    {filteredTrips.filter((t) => !isUpcoming(t)).length})
-                  </Text>
-                  <MaterialCommunityIcons
-                    name={showHistory ? "chevron-down" : "chevron-right"}
-                    size={24}
-                    color="#6B7280"
-                  />
-                </TouchableOpacity>
-
                 {showHistory &&
-                  filteredTrips
-                    .filter((t) => !isUpcoming(t))
-                    .map((trip) => (
+                  filteredTrips.map((trip) => (
                       <View key={trip.id} style={styles.historyCard}>
                         <Image
                           source={{ uri: getImageForDestination(trip.title) }}

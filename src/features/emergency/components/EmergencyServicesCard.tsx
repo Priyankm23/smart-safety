@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { Text } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Shield, Truck, Phone } from 'lucide-react-native';
 
 const EMERGENCY_SERVICES = [
     {
@@ -54,11 +54,9 @@ const EmergencyServicesCard = () => {
                     >
                         {/* Left: Icon */}
                         <View style={[styles.iconContainer, { backgroundColor: service.iconBg }]}>
-                            <MaterialCommunityIcons
-                                name={service.icon as any}
-                                size={28}
-                                color={service.iconColor}
-                            />
+                            {service.id === 'police' && <Shield size={28} color={service.iconColor} />}
+                            {service.id === 'medical' && <Truck size={28} color={service.iconColor} />}
+                            {service.id === 'safety' && <Phone size={28} color={service.iconColor} />}
                         </View>
 
                         {/* Center: Info */}
@@ -73,7 +71,7 @@ const EmergencyServicesCard = () => {
                                 style={styles.callButton}
                                 onPress={() => handleCall(service.number)}
                             >
-                                <MaterialCommunityIcons name="phone" size={22} color="#16A34A" />
+                                <Phone size={22} color="#16A34A" />
                             </TouchableOpacity>
                             <Text style={styles.serviceNumber}>{service.number}</Text>
                         </View>

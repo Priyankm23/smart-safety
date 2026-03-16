@@ -149,20 +149,6 @@ export default function EmergencyScreen({ navigation }: any) {
     }
   }, [mapReady]);
 
-  // Update map marker when location changes (from Dashboard tracking)
-  useEffect(() => {
-    if (mapReady && webViewRef.current && currentLocation) {
-      webViewRef.current.postMessage(
-        JSON.stringify({
-          type: "updateLocation",
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-          accuracy: currentLocation.coords.accuracy,
-        }),
-      );
-    }
-  }, [currentLocation, mapReady]);
-
   // Send geofences to WebView when ready
   useEffect(() => {
     if (!webViewRef.current || !mapReady || !geoFences.length) return;
@@ -195,11 +181,11 @@ export default function EmergencyScreen({ navigation }: any) {
       return;
     }
 
-    if (itineraryRoute) {
+    if (itineraryRoute || itineraryWaypoints.length > 0) {
       webViewRef.current.postMessage(
         JSON.stringify({
           type: "setRoute",
-          routes: [itineraryRoute],
+          routes: itineraryRoute ? [itineraryRoute] : [],
           selectedIndex: 0,
           profile: itineraryProfile,
           waypoints: itineraryWaypoints,
@@ -267,6 +253,15 @@ export default function EmergencyScreen({ navigation }: any) {
     return tripsWithDays[0];
   }
 
+  const toFiniteNumber = (value: any): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value.trim());
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  };
+
   const extractDayCoordinates = (nodes: any[]): RouteCoordinate[] => {
     return (nodes || [])
       .map((node) => {
@@ -276,23 +271,17 @@ export default function EmergencyScreen({ navigation }: any) {
             ? node.coordinates
             : null;
 
-        const latitude =
-          typeof node?.lat === "number"
-            ? node.lat
-            : typeof node?.latitude === "number"
-              ? node.latitude
-              : locationCoords && typeof locationCoords[1] === "number"
-                ? locationCoords[1]
-                : null;
+        const latitude = toFiniteNumber(
+          node?.lat ??
+            node?.latitude ??
+            (locationCoords ? locationCoords[1] : null),
+        );
 
-        const longitude =
-          typeof node?.lng === "number"
-            ? node.lng
-            : typeof node?.longitude === "number"
-              ? node.longitude
-              : locationCoords && typeof locationCoords[0] === "number"
-                ? locationCoords[0]
-                : null;
+        const longitude = toFiniteNumber(
+          node?.lng ??
+            node?.longitude ??
+            (locationCoords ? locationCoords[0] : null),
+        );
 
         if (!Number.isFinite(latitude) || !Number.isFinite(longitude))
           return null;
@@ -312,23 +301,17 @@ export default function EmergencyScreen({ navigation }: any) {
             ? node.coordinates
             : null;
 
-        const latitude =
-          typeof node?.lat === "number"
-            ? node.lat
-            : typeof node?.latitude === "number"
-              ? node.latitude
-              : locationCoords && typeof locationCoords[1] === "number"
-                ? locationCoords[1]
-                : null;
+        const latitude = toFiniteNumber(
+          node?.lat ??
+            node?.latitude ??
+            (locationCoords ? locationCoords[1] : null),
+        );
 
-        const longitude =
-          typeof node?.lng === "number"
-            ? node.lng
-            : typeof node?.longitude === "number"
-              ? node.longitude
-              : locationCoords && typeof locationCoords[0] === "number"
-                ? locationCoords[0]
-                : null;
+        const longitude = toFiniteNumber(
+          node?.lng ??
+            node?.longitude ??
+            (locationCoords ? locationCoords[0] : null),
+        );
 
         if (!Number.isFinite(latitude) || !Number.isFinite(longitude))
           return null;
@@ -373,22 +356,40 @@ export default function EmergencyScreen({ navigation }: any) {
     const coordinates = extractDayCoordinates(day?.nodes);
     const waypoints = extractDayWaypoints(day?.nodes);
 
-    if (coordinates.length < 2) {
+    if (coordinates.length === 0 && waypoints.length === 0) {
       setItineraryRoute(null);
       itineraryRouteKeyRef.current = null;
       setItineraryWaypoints([]);
       return;
     }
 
-    const routeKey = `${activeTrip.id}:${dayIndex}:${coordinates
-      .map(
-        (coord) => `${coord.longitude.toFixed(5)},${coord.latitude.toFixed(5)}`,
-      )
+    const routeKey = `${activeTrip.id}:${dayIndex}:${waypoints
+      .map((wp) => `${wp.longitude.toFixed(5)},${wp.latitude.toFixed(5)}`)
       .join("|")}`;
 
     if (routeKey === itineraryRouteKeyRef.current) return;
 
     itineraryRouteKeyRef.current = routeKey;
+
+    if (coordinates.length < 2) {
+      setItineraryRoute(null);
+      setItineraryWaypoints(waypoints);
+
+      if (webViewRef.current) {
+        webViewRef.current.postMessage(
+          JSON.stringify({
+            type: "setRoute",
+            routes: [],
+            selectedIndex: 0,
+            profile: itineraryProfile,
+            waypoints,
+          }),
+        );
+      }
+      return;
+    }
+
+    setItineraryWaypoints(waypoints);
     let cancelled = false;
 
     const loadRoute = async () => {
@@ -406,7 +407,6 @@ export default function EmergencyScreen({ navigation }: any) {
 
         if (!cancelled) {
           setItineraryRoute(response.routes?.[0] || null);
-          setItineraryWaypoints(waypoints);
 
           if (webViewRef.current) {
             webViewRef.current.postMessage(
@@ -424,6 +424,17 @@ export default function EmergencyScreen({ navigation }: any) {
         console.warn("[ItineraryRoute] Failed to load route:", error);
         if (!cancelled) {
           setItineraryRoute(null);
+          if (webViewRef.current) {
+            webViewRef.current.postMessage(
+              JSON.stringify({
+                type: "setRoute",
+                routes: [],
+                selectedIndex: 0,
+                profile: itineraryProfile,
+                waypoints,
+              }),
+            );
+          }
         }
       }
     };
@@ -503,6 +514,17 @@ export default function EmergencyScreen({ navigation }: any) {
   const getCurrentLocation = async () => {
     setLoadingLocation(true);
     try {
+      // Recenter quickly with last known location if available
+      if (currentLocation?.coords && webViewRef.current) {
+        webViewRef.current.postMessage(
+          JSON.stringify({
+            type: "setLocation",
+            location: currentLocation.coords,
+            forceCenter: true,
+          }),
+        );
+      }
+
       // Check permission first
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== "granted") {
@@ -523,9 +545,13 @@ export default function EmergencyScreen({ navigation }: any) {
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
+      // Try fast last-known location first to reduce delay
+      const lastKnown = await Location.getLastKnownPositionAsync();
+      const location =
+        lastKnown ||
+        (await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        }));
 
       setCurrentLocation(location);
 
@@ -544,6 +570,7 @@ export default function EmergencyScreen({ navigation }: any) {
           JSON.stringify({
             type: "setLocation",
             location: location.coords,
+            forceCenter: true,
           }),
         );
       }

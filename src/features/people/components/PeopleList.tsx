@@ -1,6 +1,6 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, Image } from "react-native"
 import { Text } from "react-native-paper"
-import { MaterialCommunityIcons } from "@expo/vector-icons"
+import { Users, User, Phone, Mail, IdCard, Edit, Droplet, Globe } from "lucide-react-native"
 import { FilterType } from "../screens/PeopleScreen"
 
 interface Person {
@@ -44,7 +44,7 @@ export default function PeopleList({ people, filter, refreshControl, onEditPress
         refreshControl={refreshControl}
       >
         <View style={styles.emptyIconContainer}>
-          <MaterialCommunityIcons name="account-group-outline" size={80} color="#CBD5E1" />
+          <Users size={80} color="#CBD5E1" />
         </View>
         <Text style={styles.emptyTitle}>No people found</Text>
         <Text style={styles.emptySubtitle}>
@@ -69,7 +69,7 @@ export default function PeopleList({ people, filter, refreshControl, onEditPress
             {/* Avatar with status indicator */}
             <View style={styles.avatarContainer}>
               <View style={styles.avatar}>
-                <MaterialCommunityIcons name="account" size={32} color="#3B82F6" />
+                <User size={32} color="#3B82F6" />
               </View>
               {person.isOnline !== undefined && (
                 <View style={[
@@ -83,18 +83,18 @@ export default function PeopleList({ people, filter, refreshControl, onEditPress
             <View style={styles.info}>
               <Text style={styles.name}>{person.name}</Text>
               <View style={styles.details}>
-                <MaterialCommunityIcons name="phone" size={14} color="#64748B" />
+                <Phone size={14} color="#64748B" />
                 <Text style={styles.detailText}>{person.phone}</Text>
               </View>
               {person.email && (
                 <View style={styles.details}>
-                  <MaterialCommunityIcons name="email" size={14} color="#64748B" />
+                  <Mail size={14} color="#64748B" />
                   <Text style={styles.detailText}>{person.email}</Text>
                 </View>
               )}
               {person.govId && (
                 <View style={styles.details}>
-                  <MaterialCommunityIcons name="card-account-details" size={14} color="#64748B" />
+                  <IdCard size={14} color="#64748B" />
                   <Text style={styles.detailText}>{person.govId}</Text>
                 </View>
               )}
@@ -106,7 +106,7 @@ export default function PeopleList({ people, filter, refreshControl, onEditPress
               onPress={() => onEditPress(person)}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="pencil" size={20} color="#3B82F6" />
+              <Edit size={20} color="#3B82F6" />
             </TouchableOpacity>
           </View>
 
@@ -115,23 +115,19 @@ export default function PeopleList({ people, filter, refreshControl, onEditPress
             <View style={styles.additionalInfo}>
               {person.bloodGroup && (
                 <View style={styles.badge}>
-                  <MaterialCommunityIcons name="water" size={12} color="#EF4444" />
+                  <Droplet size={12} color="#EF4444" />
                   <Text style={styles.badgeText}>{person.bloodGroup}</Text>
                 </View>
               )}
               {person.nationality && (
                 <View style={styles.badge}>
-                  <MaterialCommunityIcons name="earth" size={12} color="#64748B" />
+                  <Globe size={12} color="#64748B" />
                   <Text style={styles.badgeText}>{person.nationality}</Text>
                 </View>
               )}
               {person.gender && (
                 <View style={styles.badge}>
-                  <MaterialCommunityIcons 
-                    name={person.gender === "Male" ? "gender-male" : person.gender === "Female" ? "gender-female" : "gender-male-female"} 
-                    size={12} 
-                    color="#64748B" 
-                  />
+                  <User size={12} color="#64748B" />
                   <Text style={styles.badgeText}>{person.gender}</Text>
                 </View>
               )}

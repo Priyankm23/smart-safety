@@ -1,9 +1,9 @@
 import { View, ScrollView, StyleSheet, TouchableOpacity, StatusBar, Modal } from "react-native"
-import { Text, Switch, Menu, Button, IconButton } from "react-native-paper"
+import { Text, Switch, Button } from "react-native-paper"
 import QRCode from "react-native-qrcode-svg"
 import { useApp } from "../../../context/AppContext"
-import { Ionicons, MaterialIcons, MaterialCommunityIcons, FontAwesome } from "@expo/vector-icons"
-import { useState, useEffect, useRef } from "react"
+import { CheckCircle2, Edit, QrCode, Volume2, Smartphone, BellOff, ChevronRight, Bug, LogOut, X } from "lucide-react-native"
+import { useState, useEffect } from "react"
 import { useNavigation } from "@react-navigation/native"
 import { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { RootStackParamList } from "../../../navigation"
@@ -13,14 +13,11 @@ import SafetyScoreCard from "../../dashboard/components/SafetyScoreCard"
 import { Alert } from "react-native"
 
 export default function SettingsScreen() {
-  const { state, logout, setLanguage, acknowledgeHighRisk } = useApp()
+  const { state, logout } = useApp()
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>()
   const [sound, setSound] = useState(true)
   const [vibration, setVibration] = useState(true)
-  const [languageMenuVisible, setLanguageMenuVisible] = useState(false)
-  const isLanguageMenuDismissed = useRef(false)
   const [muteAllAlerts, setMuteAllAlerts] = useState(false)
-  const [suppressMinutes, setSuppressMinutes] = useState<string>("15")
   const [showQR, setShowQR] = useState(false)
 
   useEffect(() => {
@@ -31,10 +28,6 @@ export default function SettingsScreen() {
     getAlertState().then(s => {
       if (s) {
         setMuteAllAlerts(s.muted)
-        if (s.suppressionUntil && s.suppressionUntil > Date.now()) {
-          const remaining = Math.ceil((s.suppressionUntil - Date.now()) / 60000)
-          setSuppressMinutes(String(Math.max(1, remaining)))
-        }
       }
     })
   }, [])
@@ -54,44 +47,23 @@ export default function SettingsScreen() {
     await setGlobalMute(v)
   }
 
-  const getLanguageDisplay = () => {
-    switch (state.language) {
-      case 'en': return 'English'
-      case 'hi': return 'हिंदी'
-      default: return 'English'
-    }
-  }
-
-  const openLanguageMenu = () => {
-    if (isLanguageMenuDismissed.current) {
-      isLanguageMenuDismissed.current = false
-      return
-    }
-    if (languageMenuVisible) return
-    setLanguageMenuVisible(true)
-  }
-
-  const closeLanguageMenu = () => {
-    isLanguageMenuDismissed.current = true
-    setLanguageMenuVisible(false)
-    setTimeout(() => {
-      isLanguageMenuDismissed.current = false
-    }, 200)
-  }
-
-  const menuItems = [
-    {
-      section: "Account",
-      items: [
-        { icon: "person-outline", label: "Personal Information", color: "#3B82F6", onPress: () => navigation.navigate('PersonalInfo') },
-        { icon: "notifications-outline", label: "Notifications", color: "#F59E0B", onPress: () => { } },
-      ]
-    },
+  const menuItems: Array<{
+    section: string;
+    items: Array<{
+      icon: React.ReactNode;
+      label: string;
+      color: string;
+      isToggle: boolean;
+      value?: boolean;
+      onToggle?: (v: boolean) => void;
+      onPress?: () => void;
+    }>;
+  }> = [
     {
       section: "Preferences",
       items: [
         {
-          icon: "volume-high-outline",
+          icon: <Volume2 size={18} color="#8B5CF6" />,
           label: "Sound",
           color: "#8B5CF6",
           isToggle: true,
@@ -99,29 +71,13 @@ export default function SettingsScreen() {
           onToggle: toggleSound
         },
         {
-          icon: "phone-portrait-outline",
+          icon: <Smartphone size={18} color="#EC4899" />,
           label: "Vibration",
           color: "#EC4899",
           isToggle: true,
           value: vibration,
           onToggle: toggleVibration
         },
-        {
-          icon: "language",
-          label: "Language",
-          color: "#06B6D4",
-          value: getLanguageDisplay(),
-          isMenu: true,
-          onPress: openLanguageMenu
-        },
-      ]
-    },
-    {
-      section: "Support",
-      items: [
-        { icon: "help-circle-outline", label: "Help Center", color: "#14B8A6", onPress: () => navigation.navigate('HelpCenter') },
-        { icon: "mail-outline", label: "Contact Us", color: "#6366F1", onPress: () => { } },
-        { icon: "document-text-outline", label: "Terms of Service", color: "#64748B", onPress: () => { } },
       ]
     },
   ]
@@ -142,7 +98,7 @@ export default function SettingsScreen() {
                 <Text style={styles.avatarText}>{state.user?.name?.charAt(0) || "U"}</Text>
               </View>
               <View style={styles.verifiedBadge}>
-                <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                <CheckCircle2 size={14} color="#fff" />
               </View>
             </View>
             <View style={styles.profileInfo}>
@@ -153,12 +109,12 @@ export default function SettingsScreen() {
 
           <View style={styles.profileActions}>
             <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('PersonalInfo')}>
-              <Ionicons name="create-outline" size={18} color="#3B82F6" />
+              <Edit size={18} color="#3B82F6" />
               <Text style={styles.actionButtonText}>Edit Profile</Text>
             </TouchableOpacity>
             <View style={styles.actionDivider} />
             <TouchableOpacity style={styles.actionButton} onPress={() => setShowQR(true)}>
-              <Ionicons name="qr-code-outline" size={18} color="#3B82F6" />
+              <QrCode size={18} color="#3B82F6" />
               <Text style={styles.actionButtonText}>My QR</Text>
             </TouchableOpacity>
           </View>
@@ -168,7 +124,7 @@ export default function SettingsScreen() {
 
 
         {/* Menu Sections */}
-        {menuItems.map((section, sectionIndex) => (
+        {menuItems.map(section => (
           <View key={section.section} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.section}</Text>
             <View style={styles.sectionCard}>
@@ -178,7 +134,7 @@ export default function SettingsScreen() {
                     <View style={styles.menuItem}>
                       <View style={styles.menuItemLeft}>
                         <View style={[styles.menuIcon, { backgroundColor: item.color + "20" }]}>
-                          <Ionicons name={item.icon as any} size={18} color={item.color} />
+                          {item.icon}
                         </View>
                         <Text style={styles.menuItemText}>{item.label}</Text>
                       </View>
@@ -188,52 +144,15 @@ export default function SettingsScreen() {
                         color="#3B82F6"
                       />
                     </View>
-                  ) : item.isMenu ? (
-                    <Menu
-                      visible={languageMenuVisible}
-                      onDismiss={closeLanguageMenu}
-                      anchor={
-                        <TouchableOpacity style={styles.menuItem} onPress={item.onPress} activeOpacity={0.7}>
-                          <View style={styles.menuItemLeft}>
-                            <View style={[styles.menuIcon, { backgroundColor: item.color + "20" }]}>
-                              <MaterialIcons name={item.icon as any} size={18} color={item.color} />
-                            </View>
-                            <Text style={styles.menuItemText}>{item.label}</Text>
-                          </View>
-                          <View style={styles.menuItemRight}>
-                            <Text style={styles.menuItemValue}>{item.value}</Text>
-                            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-                          </View>
-                        </TouchableOpacity>
-                      }
-                    >
-                      <Menu.Item
-                        onPress={() => {
-                          setLanguageMenuVisible(false)
-                          setTimeout(() => setLanguage('en'), 200)
-                        }}
-                        title="English"
-                        leadingIcon="check"
-                        disabled={state.language === 'en'}
-                      />
-                      <Menu.Item
-                        onPress={() => {
-                          setLanguageMenuVisible(false)
-                          setTimeout(() => setLanguage('hi'), 200)
-                        }}
-                        title="हिंदी (Hindi)"
-                        disabled={state.language === 'hi'}
-                      />
-                    </Menu>
                   ) : (
                     <TouchableOpacity style={styles.menuItem} onPress={item.onPress} activeOpacity={0.7}>
                       <View style={styles.menuItemLeft}>
                         <View style={[styles.menuIcon, { backgroundColor: item.color + "20" }]}>
-                          <Ionicons name={item.icon as any} size={18} color={item.color} />
+                          {item.icon}
                         </View>
                         <Text style={styles.menuItemText}>{item.label}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                      <ChevronRight size={18} color="#9CA3AF" />
                     </TouchableOpacity>
                   )}
                   {itemIndex < section.items.length - 1 && <View style={styles.menuDivider} />}
@@ -250,7 +169,7 @@ export default function SettingsScreen() {
             <View style={styles.menuItem}>
               <View style={styles.menuItemLeft}>
                 <View style={[styles.menuIcon, { backgroundColor: "#FEE2E220" }]}>
-                  <Ionicons name="notifications-off-outline" size={18} color="#EF4444" />
+                  <BellOff size={18} color="#EF4444" />
                 </View>
                 <View>
                   <Text style={styles.menuItemText}>Mute High-Risk Alerts</Text>
@@ -285,11 +204,11 @@ export default function SettingsScreen() {
               >
                 <View style={styles.menuItemLeft}>
                   <View style={[styles.menuIcon, { backgroundColor: "#F9731620" }]}>
-                    <MaterialCommunityIcons name="bug-outline" size={18} color="#F97316" />
+                    <Bug size={18} color="#F97316" />
                   </View>
                   <Text style={styles.menuItemText}>View SOS Queue</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                <ChevronRight size={18} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
           </View>
@@ -298,7 +217,7 @@ export default function SettingsScreen() {
         {/* Footer Actions */}
         <View style={styles.footer}>
           <TouchableOpacity style={styles.logoutButton} onPress={logout} activeOpacity={0.7}>
-            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+            <LogOut size={20} color="#EF4444" />
             <Text style={styles.logoutText}>Log Out</Text>
           </TouchableOpacity>
 
@@ -321,11 +240,9 @@ export default function SettingsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>My QR Code</Text>
-              <IconButton
-                icon="close"
-                size={24}
-                onPress={() => setShowQR(false)}
-              />
+              <TouchableOpacity onPress={() => setShowQR(false)} style={styles.closeButton}>
+                <X size={24} color="#1f2937" />
+              </TouchableOpacity>
             </View>
 
             <View style={styles.qrContainer}>
@@ -532,15 +449,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
     marginTop: 2,
-  },
-  menuItemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  menuItemValue: {
-    fontSize: 14,
-    color: '#6B7280',
   },
   menuDivider: {
     height: 1,

@@ -37,8 +37,9 @@ export default function DirectionsBottomSheet({
   const translateY = useSharedValue(300);
   
   // Path deviation context
+  // NOTE: startJourney commented out (path deviation disabled)
   const { 
-    startJourney, 
+    // startJourney, 
     isTracking, 
   } = usePathDeviation();
 
@@ -63,7 +64,8 @@ export default function DirectionsBottomSheet({
 
   const routeSummary = getRouteSummary(route);
 
-  const handleStartNavigation = async () => {
+  // PATH DEVIATION: Handler commented out - Start button disabled for all users
+  /* const handleStartNavigation = async () => {
     try {
       const coords = route.geometry.coordinates;
       const origin = coords[0]; // [lng, lat]
@@ -96,7 +98,7 @@ export default function DirectionsBottomSheet({
         [{ text: 'OK' }]
       );
     }
-  };
+  }; */
 
   const isEcoFriendly = profile === 'walking' || profile === 'cycling';
 
@@ -137,10 +139,11 @@ export default function DirectionsBottomSheet({
         </Text>
 
         <View style={styles.actionGrid}>
-          <TouchableOpacity style={styles.actionBtnPrimary} onPress={handleStartNavigation}>
+          {/* PATH DEVIATION: Commented out for all users (solo, tour admin, group members) */}
+          {/* <TouchableOpacity style={styles.actionBtnPrimary} onPress={handleStartNavigation}>
             <MaterialCommunityIcons name="navigation" size={20} color="white" />
             <Text style={styles.actionBtnTextPrimary}>Start</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           <TouchableOpacity
             style={styles.actionBtnSecondary}

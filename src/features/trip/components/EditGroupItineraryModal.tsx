@@ -152,9 +152,6 @@ export default function EditGroupItineraryModal({
 
     setSaving(true);
     try {
-      console.log('[EditModal] User role:', userRole);
-      console.log('[EditModal] Updating itinerary with days:', days);
-
       let result;
       
       if (userRole === 'solo') {
@@ -168,7 +165,6 @@ export default function EditGroupItineraryModal({
       }
 
       if (result.ok) {
-        console.log('[EditModal] Update successful');
         onSuccess();
         onDismiss();
       } else {

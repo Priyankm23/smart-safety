@@ -32,7 +32,6 @@ import {
   filterFencesByDistance,
   haversineKm,
 } from "../../../utils/geofenceLogic";
-import touristSocketService from "../../../services/touristSocketService";
 
 const NEARBY_FENCE_RADIUS_KM = 15;
 const LOCATION_REFILTER_THRESHOLD_KM = 5;
@@ -97,7 +96,8 @@ export default function MapboxMap({
   const webViewRef = useRef<WebView>(null);
 
   // Connect map to path deviation tracking
-  const { setMapRef, isTracking } = usePathDeviation();
+  const { setMapRef } = usePathDeviation();
+  const { setMapRef, isTracking, recenterMap } = usePathDeviation();
 
   // Set map reference for path deviation tracking AFTER map is ready
   useEffect(() => {
@@ -109,81 +109,6 @@ export default function MapboxMap({
       setMapRef(null);
     };
   }, [setMapRef, mapReady]);
-
-  // Watch user location when map is ready and not in tracking mode (journey)
-  useEffect(() => {
-    let locationSubscription: Location.LocationSubscription | null = null;
-
-    const startLocationWatch = async () => {
-      if (!showCurrentLocation || !locationPermissionGranted || isTracking)
-        return;
-
-      try {
-        locationSubscription = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            timeInterval: 2000,
-            distanceInterval: 5,
-          },
-          (newLocation) => {
-            setLocation(newLocation);
-
-            // Notify parent
-            if (onLocationChange) {
-              onLocationChange(newLocation);
-            }
-
-            // Send to WebView
-            if (webViewRef.current && mapReady) {
-              webViewRef.current.postMessage(
-                JSON.stringify({
-                  type: "setLocation",
-                  location: newLocation.coords,
-                }),
-              );
-            }
-
-            // Re-filter fences if needed
-            refilterFencesIfNeeded(
-              newLocation.coords.latitude,
-              newLocation.coords.longitude,
-            );
-          },
-        );
-      } catch (err) {
-        console.error("Failed to watch location:", err);
-      }
-    };
-
-    if (mapReady && locationPermissionGranted && !isTracking) {
-      startLocationWatch();
-    }
-
-    return () => {
-      if (locationSubscription) {
-        locationSubscription.remove();
-      }
-    };
-  }, [showCurrentLocation, locationPermissionGranted, mapReady, isTracking]);
-
-  // Subscribe to risk grid updates from backend
-  useEffect(() => {
-    const unsubscribe = touristSocketService.on(
-      "riskGridUpdated",
-      (data: any) => {
-        console.log("[MapboxMap] Received risk grid update:", data);
-        if (webViewRef.current && mapReady) {
-          webViewRef.current.postMessage(
-            JSON.stringify({
-              type: "updateRiskGrid",
-              gridData: data,
-            }),
-          );
-        }
-      },
-    );
-    return unsubscribe;
-  }, [mapReady]);
 
   // Request location permissions on mount and load geofences
   useEffect(() => {
@@ -598,6 +523,13 @@ export default function MapboxMap({
 
           <RightActionButtons
             onCompassPress={getCurrentLocation}
+            onCompassPress={() => {
+              if (isTracking) {
+                recenterMap();
+                return;
+              }
+              getCurrentLocation();
+            }}
             onLayersPress={() => setShowStyleSelector(!showStyleSelector)}
             onSOSPress={() => {
               setShowStyleSelector(false);

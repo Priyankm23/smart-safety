@@ -78,7 +78,6 @@ export async function fetchCategoryRecommendation(category: string): Promise<Saf
     
     // If content is empty but reasoning exists, try to extract from reasoning
     if (!text && reasoning) {
-      console.log(`Groq: Using reasoning field for ${category}`);
       text = reasoning;
     }
     
@@ -86,8 +85,6 @@ export async function fetchCategoryRecommendation(category: string): Promise<Saf
       console.warn(`Groq: Empty response for ${category}, using static tip`);
       return getStaticTip(category);
     }
-
-    console.log(`Groq: Raw content for ${category}:`, text.substring(0, 200));
 
     // Extract JSON from response
     let jsonText = text;
@@ -130,8 +127,6 @@ export async function fetchCategoryRecommendation(category: string): Promise<Saf
 export async function fetchAllSafetyRecommendations(): Promise<SafetyRecommendation[]> {
   const categories = ['Weather', 'Transportation', 'Night Travel', 'Belongings', 'Emergency'];
   
-  console.log('Groq: Starting to fetch all recommendations...');
-  
   // Fetch recommendations sequentially with delay to avoid rate limits
   const recommendations: SafetyRecommendation[] = [];
   
@@ -147,6 +142,5 @@ export async function fetchAllSafetyRecommendations(): Promise<SafetyRecommendat
     }
   }
   
-  console.log('Groq: Finished fetching all recommendations');
   return recommendations;
 }

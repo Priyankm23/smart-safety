@@ -3,6 +3,7 @@ declare module 'react-native-sms' {
     body?: string
     recipients?: string[]
     successTypes?: Array<'sent' | 'queued'>
+    allowAndroidSendWithoutReadPermission?: boolean
     allowAndroidSendWithoutPrompt?: boolean
   }
 

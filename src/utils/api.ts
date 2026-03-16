@@ -283,7 +283,6 @@ export const getGroupDashboard = async (token) => {
 
 export const getSoloItinerary = async (token) => {
   try {
-    console.log('[API] Fetching solo itinerary from /api/itinerary');
     const response = await fetch(`${SERVER_URL}/api/itinerary`, {
       method: "GET",
       headers: {
@@ -292,7 +291,6 @@ export const getSoloItinerary = async (token) => {
       },
     });
     const res = await handleResponse(response);
-    console.log('[API] getSoloItinerary response:', res);
     return res;
   } catch (e) {
     console.error("API: getSoloItinerary error", { error: e?.message || e });
@@ -302,8 +300,6 @@ export const getSoloItinerary = async (token) => {
 
 export const updateSoloItinerary = async (token, itinerary) => {
   try {
-    console.log('[API] Updating solo itinerary via PUT /api/itinerary');
-    console.log('[API] Itinerary payload:', JSON.stringify(itinerary, null, 2));
     const response = await fetch(`${SERVER_URL}/api/itinerary`, {
       method: "PUT",
       headers: {
@@ -313,7 +309,6 @@ export const updateSoloItinerary = async (token, itinerary) => {
       body: JSON.stringify({ itinerary }),
     });
     const res = await handleResponse(response);
-    console.log('[API] updateSoloItinerary response:', res);
     return res;
   } catch (e) {
     console.error("API: updateSoloItinerary error", { error: e?.message || e });
@@ -370,6 +365,14 @@ export const itineraryToTrips = (
   itinerary: any[],
 ): Array<{ id: string; title: string; date: string; notes?: string; dayWiseItinerary?: any[] }> => {
   const baseTs = Date.now();
+  const toFiniteNumber = (value: any): number | undefined => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Number(value.trim());
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return undefined;
+  };
 
   const normalizeNode = (node: any) => {
     if (!node || typeof node !== 'object') return node;
@@ -380,23 +383,13 @@ export const itineraryToTrips = (
         ? node.coordinates
         : null;
 
-    const lat =
-      typeof node.lat === 'number'
-        ? node.lat
-        : typeof node.latitude === 'number'
-          ? node.latitude
-          : locationCoords && typeof locationCoords[1] === 'number'
-            ? locationCoords[1]
-            : undefined;
+    const lat = toFiniteNumber(
+      node.lat ?? node.latitude ?? (locationCoords ? locationCoords[1] : undefined)
+    );
 
-    const lng =
-      typeof node.lng === 'number'
-        ? node.lng
-        : typeof node.longitude === 'number'
-          ? node.longitude
-          : locationCoords && typeof locationCoords[0] === 'number'
-            ? locationCoords[0]
-            : undefined;
+    const lng = toFiniteNumber(
+      node.lng ?? node.longitude ?? (locationCoords ? locationCoords[0] : undefined)
+    );
 
     return {
       ...node,
@@ -611,7 +604,7 @@ export const sendWelcomeEmailsToAll = async (token) => {
     const res = await handleResponse(response);
     return res;
   } catch (e) {
-    console.error("API: sendWelcomeEmailsToAll error", { error: e?.message || e });
+    // Error will be handled and displayed via dialog in the component
     throw e;
   }
 };

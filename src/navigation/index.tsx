@@ -146,15 +146,6 @@ function MainTabs() {
                   >
                     Dashboard
                   </Text>
-                  <View
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor: activeColor,
-                      marginTop: 3,
-                    }}
-                  />
                 </>
               )}
             </View>
@@ -162,7 +153,7 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="Emergency"
+        name="Map"
         component={EmergencyScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
@@ -188,17 +179,8 @@ function MainTabs() {
                       fontWeight: "600",
                     }}
                   >
-                    Emergency
+                    Map
                   </Text>
-                  <View
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor: activeColor,
-                      marginTop: 3,
-                    }}
-                  />
                 </>
               )}
             </View>
@@ -234,15 +216,6 @@ function MainTabs() {
                   >
                     Itinerary
                   </Text>
-                  <View
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor: activeColor,
-                      marginTop: 3,
-                    }}
-                  />
                 </>
               )}
             </View>
@@ -279,15 +252,6 @@ function MainTabs() {
                     >
                       People
                     </Text>
-                    <View
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 3,
-                        backgroundColor: activeColor,
-                        marginTop: 3,
-                      }}
-                    />
                   </>
                 )}
               </View>
@@ -322,17 +286,8 @@ function MainTabs() {
                       fontWeight: "600",
                     }}
                   >
-                    Settings
+                    Map
                   </Text>
-                  <View
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor: activeColor,
-                      marginTop: 3,
-                    }}
-                  />
                 </>
               )}
             </View>

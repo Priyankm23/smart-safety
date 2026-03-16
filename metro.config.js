@@ -1,8 +1,9 @@
-// @ts-check
-const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
+const {
+    getSentryExpoConfig
+} = require("@sentry/react-native/metro");
 
-const config = getDefaultConfig(__dirname);
+const config = getSentryExpoConfig(__dirname);
 
 // Enable SVG transformer for inline SVG components
 config.transformer = {

@@ -53,23 +53,16 @@ export default function SafetyScore() {
 
     // Try to set up listener with retries until socket is initialized
     const setupListener = () => {
-      console.log(
-        "🔧 Attempting to set up safety score socket listener (attempt",
-        retryCount + 1,
-        ")",
-      );
-
       // Check if socket is initialized (meaning connect() has been called)
       // We don't need to wait for full connection (handshake), just for the socket object to exist
       // This allows us to catch events that might come immediately after connection
       if (!touristSocket.isInitialized()) {
         retryCount++;
         if (retryCount < maxRetries) {
-          console.log("⏳ Socket not initialized yet, retrying in 500ms...");
           setTimeout(setupListener, 500);
         } else {
           console.warn(
-            "❌ Failed to set up listener after",
+            "Failed to set up listener after",
             maxRetries,
             "attempts",
           );
@@ -77,18 +70,11 @@ export default function SafetyScore() {
         return;
       }
 
-      console.log(
-        "✅ Socket initialized! Setting up safety score listener now...",
-      );
-
       // Set up socket listener for backend safety score updates
       // Store the cleanup function
       cleanupFunction = touristSocket.onSafetyScoreUpdate(
         (data: SafetyScoreData) => {
           if (!mounted) return;
-
-          console.log("📊 Received safety score update from socket:", data);
-          console.log("📊 Score value:", data.safetyScore);
 
           // Format nearest threat info
           let threatInfo = "No immediate threats detected";
@@ -118,12 +104,8 @@ export default function SafetyScore() {
           setCombinedLoading(false);
           setCombinedError(null);
           setComputedSafetyScore(data.safetyScore);
-
-          console.log("✅ UI updated with score:", data.safetyScore);
         },
       );
-
-      console.log("✅ Safety score listener successfully registered!");
     };
 
     // Start trying to set up listener
@@ -133,7 +115,6 @@ export default function SafetyScore() {
       mounted = false;
       if (cleanupFunction) {
         cleanupFunction();
-        console.log("🧹 Cleaned up safety score listener");
       }
     };
   }, []); // Run only once on mount
@@ -197,15 +178,6 @@ export default function SafetyScore() {
 
   const displayScore = combinedResult?.score ?? 0;
   const isLoading = locationLoading || combinedLoading;
-
-  // Debug logging to track what's being rendered
-  console.log("🎨 SafetyScore render:", {
-    displayScore,
-    combinedResultScore: combinedResult?.score,
-    isUsingSocketData,
-    isLoading,
-    lastUpdateTime: lastUpdateTime?.toISOString(),
-  });
 
   // Badge and color based on score
   const getScoreInfo = (score: number) => {

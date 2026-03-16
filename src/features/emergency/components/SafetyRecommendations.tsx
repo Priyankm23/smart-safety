@@ -1,6 +1,6 @@
 import { Text, ActivityIndicator } from "react-native-paper"
 import { View, StyleSheet } from "react-native"
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Cloud, Bus, Moon, CreditCard, Phone } from 'lucide-react-native';
 import { useEffect, useState } from "react";
 import { fetchAllSafetyRecommendations, SafetyRecommendation } from "../../../services/safetyRecommendations";
 
@@ -90,11 +90,17 @@ export default function SafetyRecommendations() {
           {displayTips.map((tip, index) => (
             <View key={`tip${index}`} style={styles.tipItem}>
               <View style={[styles.iconContainer, { backgroundColor: tip.iconBg }]}>
-                <MaterialCommunityIcons
-                  name={tip.icon as any}
-                  size={24}
-                  color={tip.iconColor}
-                />
+                {(() => {
+                  const IconMap: Record<string, any> = {
+                    'weather-partly-cloudy': Cloud,
+                    'bus': Bus,
+                    'weather-night': Moon,
+                    'wallet': CreditCard,
+                    'phone-alert': Phone,
+                  };
+                  const IconComp = IconMap[tip.icon] || Cloud;
+                  return <IconComp size={24} color={tip.iconColor} />;
+                })()}
               </View>
               <View style={styles.tipContent}>
                 <Text style={styles.tipTitle}>{tip.title}</Text>

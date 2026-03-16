@@ -17,3 +17,4 @@ android
 .env.production
 package-lock.json
 docs/
+.env.local

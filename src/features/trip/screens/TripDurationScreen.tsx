@@ -106,7 +106,7 @@ export default function TripDurationScreen() {
         accessibilityRole="button"
         accessibilityLabel="Back"
       >
-        <MaterialCommunityIcons name="arrow-left" size={20} color="#171725" />
+        <MaterialCommunityIcons name="arrow-left" size={20} color="#0C87DE" />
       </Pressable>
 
       <View style={styles.totalDurationCard}>
@@ -118,7 +118,7 @@ export default function TripDurationScreen() {
             onPress={handleDecrement}
             disabled={tripDuration <= 1}
             style={styles.circleButton}
-            iconColor="#171725"
+            iconColor="#0C87DE"
           />
           <View style={styles.durationCenter}>
             <Text style={styles.durationNumber}>{tripDuration}</Text>
@@ -130,7 +130,7 @@ export default function TripDurationScreen() {
             onPress={handleIncrement}
             disabled={tripDuration >= 150}
             style={styles.circleButton}
-            iconColor="#171725"
+            iconColor="#0C87DE"
           />
         </View>
       </View>
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
   durationNumber: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000000',
+    color: '#0C87DE',
   },
   durationUnit: {
     marginTop: 6,
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#171725',
+    color: '#0C87DE',
     marginBottom: 8,
   },
   inputField: {
