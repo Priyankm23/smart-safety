@@ -26,6 +26,7 @@ import { triggerSOS } from "../../../utils/api";
 import { queueSOS } from "../../../utils/offlineQueue";
 import { sendSMS } from "../../../utils/sms";
 import { queueSMS } from "../../../utils/smsQueue";
+<<<<<<< Updated upstream
 import {
   Heart,
   Shield,
@@ -35,6 +36,10 @@ import {
   ChevronRight,
   Wifi,
 } from "lucide-react-native";
+=======
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import touristSocketService from "../../../services/touristSocketService";
+>>>>>>> Stashed changes
 
 interface PanicActionsProps {
   onSOSTriggered?: () => void;
@@ -304,6 +309,12 @@ export default function PanicActions({
 
       console.log("[PanicActions] Triggering SOS:", label);
       await triggerSOS(currentToken, sosData);
+
+      // Request immediate safety score recalculation after SOS trigger
+      console.log(
+        "[PanicActions] Requesting safety score update after SOS trigger",
+      );
+      touristSocketService.requestSafetyScoreUpdate();
 
       try {
         const recipients = [

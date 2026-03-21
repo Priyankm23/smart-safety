@@ -20,9 +20,13 @@ import { loadFences } from "../../map/services/geofenceService";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   Route,
+<<<<<<< Updated upstream
   RouteCoordinate,
   RoutingProfile,
   fetchDirectionsForWaypoints,
+=======
+  RoutingProfile,
+>>>>>>> Stashed changes
 } from "../../map/services/mapboxDirectionsService";
 
 // Import map components
@@ -76,6 +80,7 @@ export default function EmergencyScreen({ navigation }: any) {
     useState<RoutingProfile>("driving");
   const [isDirectionsSheetVisible, setIsDirectionsSheetVisible] =
     useState(false);
+<<<<<<< Updated upstream
   const [itineraryRoute, setItineraryRoute] = useState<Route | null>(null);
   const [itineraryWaypoints, setItineraryWaypoints] = useState<any[]>([]);
 
@@ -87,6 +92,10 @@ export default function EmergencyScreen({ navigation }: any) {
     () => selectActiveTrip(state.trips),
     [state.trips],
   );
+=======
+
+  const currentRoute = allRoutes[selectedRouteIndex] || null;
+>>>>>>> Stashed changes
 
   // Geofences
   const [geoFences, setGeoFences] = useState<GeoFence[]>([]);
@@ -114,10 +123,16 @@ export default function EmergencyScreen({ navigation }: any) {
     const loadGeoFencesFromService = async () => {
       setLoadingGeofences(true);
       try {
+<<<<<<< Updated upstream
         const userId = state.user?.touristId;
         const fences = await loadFences(undefined, undefined, userId);
         setGeoFences(fences);
         console.log("Loaded geofences:", fences.length, "for user:", userId);
+=======
+        const fences = await loadFences();
+        setGeoFences(fences);
+        console.log("Loaded geofences:", fences.length);
+>>>>>>> Stashed changes
       } catch (err) {
         console.warn("Failed to load geofences:", err);
         setGeoFences([]);
@@ -148,6 +163,23 @@ export default function EmergencyScreen({ navigation }: any) {
       getCurrentLocation();
     }
   }, [mapReady]);
+<<<<<<< Updated upstream
+=======
+
+  // Update map marker when location changes (from Dashboard tracking)
+  useEffect(() => {
+    if (mapReady && webViewRef.current && currentLocation) {
+      webViewRef.current.postMessage(
+        JSON.stringify({
+          type: "updateLocation",
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude,
+          accuracy: currentLocation.coords.accuracy,
+        }),
+      );
+    }
+  }, [currentLocation, mapReady]);
+>>>>>>> Stashed changes
 
   // Send geofences to WebView when ready
   useEffect(() => {
@@ -167,6 +199,7 @@ export default function EmergencyScreen({ navigation }: any) {
 
   // Update map when routes change
   useEffect(() => {
+<<<<<<< Updated upstream
     if (!webViewRef.current || !mapReady) return;
 
     if (directionsMode && allRoutes.length > 0) {
@@ -445,6 +478,27 @@ export default function EmergencyScreen({ navigation }: any) {
       cancelled = true;
     };
   }, [mapReady, directionsMode, activeTrip, itineraryProfile]);
+=======
+    if (webViewRef.current && mapReady) {
+      if (allRoutes.length > 0) {
+        webViewRef.current.postMessage(
+          JSON.stringify({
+            type: "setRoute",
+            routes: allRoutes,
+            selectedIndex: selectedRouteIndex,
+            profile: currentProfile,
+          }),
+        );
+      } else {
+        webViewRef.current.postMessage(
+          JSON.stringify({
+            type: "clearRoute",
+          }),
+        );
+      }
+    }
+  }, [allRoutes, selectedRouteIndex, currentProfile, mapReady]);
+>>>>>>> Stashed changes
 
   // Calculate legend statistics whenever geofences change
   useEffect(() => {
@@ -464,10 +518,14 @@ export default function EmergencyScreen({ navigation }: any) {
     const geofences = geoFences.filter(
       (f) =>
         f.visualStyle?.zoneType === "geofence" ||
+<<<<<<< Updated upstream
         f.visualStyle?.zoneType === "itinerary_geofence" ||
         f.category === "Tourist Destination" ||
         f.category === "Itinerary Geofence" ||
         f.metadata?.sourceType === "itinerary",
+=======
+        f.category === "Tourist Destination",
+>>>>>>> Stashed changes
     ).length;
 
     setDangerZoneCount(danger);
@@ -481,6 +539,7 @@ export default function EmergencyScreen({ navigation }: any) {
       setIsBackgroundRefreshing(true);
       const userLat = currentLocation?.coords.latitude;
       const userLng = currentLocation?.coords.longitude;
+<<<<<<< Updated upstream
       const userId = state.user?.touristId;
 
       const fences = await loadFences(userLat, userLng, userId);
@@ -489,6 +548,13 @@ export default function EmergencyScreen({ navigation }: any) {
       console.log(
         `[Auto-Refresh] Refreshed ${fences.length} geofences for user: ${userId}`,
       );
+=======
+
+      const fences = await loadFences(userLat, userLng);
+      setGeoFences(fences);
+
+      console.log(`[Auto-Refresh] Refreshed ${fences.length} geofences`);
+>>>>>>> Stashed changes
     } catch (err) {
       console.warn("Failed to refresh geofences:", err);
       // Don't show error to user - fail silently for background refresh
@@ -514,6 +580,7 @@ export default function EmergencyScreen({ navigation }: any) {
   const getCurrentLocation = async () => {
     setLoadingLocation(true);
     try {
+<<<<<<< Updated upstream
       // Recenter quickly with last known location if available
       if (currentLocation?.coords && webViewRef.current) {
         webViewRef.current.postMessage(
@@ -553,6 +620,32 @@ export default function EmergencyScreen({ navigation }: any) {
           accuracy: Location.Accuracy.High,
         }));
 
+=======
+      // Check permission first
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Location Permission Required",
+          "Please enable location services to use this feature",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Settings",
+              onPress: async () => {
+                await Location.requestForegroundPermissionsAsync();
+              },
+            },
+          ],
+        );
+        setLoadingLocation(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+>>>>>>> Stashed changes
       setCurrentLocation(location);
 
       // Reverse geocode
@@ -570,7 +663,10 @@ export default function EmergencyScreen({ navigation }: any) {
           JSON.stringify({
             type: "setLocation",
             location: location.coords,
+<<<<<<< Updated upstream
             forceCenter: true,
+=======
+>>>>>>> Stashed changes
           }),
         );
       }
@@ -602,7 +698,11 @@ export default function EmergencyScreen({ navigation }: any) {
           console.error("Map error:", message.message);
           break;
         case "routeSelected":
+<<<<<<< Updated upstream
           if (directionsMode && message.index !== undefined) {
+=======
+          if (message.index !== undefined) {
+>>>>>>> Stashed changes
             setSelectedRouteIndex(message.index);
           }
           break;

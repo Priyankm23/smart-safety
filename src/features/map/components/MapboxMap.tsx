@@ -2,7 +2,10 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { StyleSheet, Platform, Alert, Dimensions, View } from "react-native";
 import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
+<<<<<<< Updated upstream
 import { useApp } from "../../../context/AppContext";
+=======
+>>>>>>> Stashed changes
 
 // Import path deviation context
 import { usePathDeviation } from "../../../context/PathDeviationContext";
@@ -32,6 +35,10 @@ import {
   filterFencesByDistance,
   haversineKm,
 } from "../../../utils/geofenceLogic";
+<<<<<<< Updated upstream
+=======
+import touristSocketService from "../../../services/touristSocketService";
+>>>>>>> Stashed changes
 
 const NEARBY_FENCE_RADIUS_KM = 15;
 const LOCATION_REFILTER_THRESHOLD_KM = 5;
@@ -61,7 +68,10 @@ export default function MapboxMap({
   isFullScreen = false,
   onToggleFullScreen,
 }: MapboxMapProps) {
+<<<<<<< Updated upstream
   const { state } = useApp();
+=======
+>>>>>>> Stashed changes
   const [location, setLocation] = useState<Location.LocationObject | null>(
     null,
   );
@@ -96,8 +106,12 @@ export default function MapboxMap({
   const webViewRef = useRef<WebView>(null);
 
   // Connect map to path deviation tracking
+<<<<<<< Updated upstream
   const { setMapRef } = usePathDeviation();
   const { setMapRef, isTracking, recenterMap } = usePathDeviation();
+=======
+  const { setMapRef, isTracking } = usePathDeviation();
+>>>>>>> Stashed changes
 
   // Set map reference for path deviation tracking AFTER map is ready
   useEffect(() => {
@@ -110,6 +124,84 @@ export default function MapboxMap({
     };
   }, [setMapRef, mapReady]);
 
+<<<<<<< Updated upstream
+=======
+  // Watch user location when map is ready and not in tracking mode (journey)
+  useEffect(() => {
+    let locationSubscription: Location.LocationSubscription | null = null;
+
+    const startLocationWatch = async () => {
+      if (!showCurrentLocation || !locationPermissionGranted || isTracking)
+        return;
+
+      try {
+        locationSubscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 2000,
+            distanceInterval: 5,
+          },
+          (newLocation) => {
+            setLocation(newLocation);
+
+            // Notify parent
+            if (onLocationChange) {
+              onLocationChange(newLocation);
+            }
+
+            // Send to WebView
+            if (webViewRef.current && mapReady) {
+              webViewRef.current.postMessage(
+                JSON.stringify({
+                  type: "setLocation",
+                  location: newLocation.coords,
+                }),
+              );
+            }
+
+            // Re-filter fences if needed
+            refilterFencesIfNeeded(
+              newLocation.coords.latitude,
+              newLocation.coords.longitude,
+            );
+          },
+        );
+      } catch (err) {
+        console.error("Failed to watch location:", err);
+      }
+    };
+
+    if (mapReady && locationPermissionGranted && !isTracking) {
+      startLocationWatch();
+    }
+
+    return () => {
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
+    };
+  }, [showCurrentLocation, locationPermissionGranted, mapReady, isTracking]);
+
+  // Subscribe to risk grid updates from backend
+  useEffect(() => {
+    const unsubscribe = touristSocketService.on(
+      "riskGridUpdated",
+      (data: any) => {
+        console.log("[MapboxMap] Received risk grid update:", data);
+        if (webViewRef.current && mapReady) {
+          webViewRef.current.postMessage(
+            JSON.stringify({
+              type: "updateRiskGrid",
+              gridData: data,
+            }),
+          );
+        }
+      },
+    );
+    return unsubscribe;
+  }, [mapReady]);
+
+>>>>>>> Stashed changes
   // Request location permissions on mount and load geofences
   useEffect(() => {
     (async () => {
@@ -141,6 +233,7 @@ export default function MapboxMap({
 
   const loadAllFencesWithoutFiltering = async () => {
     try {
+<<<<<<< Updated upstream
       const geofenceService = require("../services/geofenceService").default;
       let data = geofenceService.getFences();
       if (!data || data.length === 0) {
@@ -150,6 +243,9 @@ export default function MapboxMap({
       if (!data || data.length === 0) {
         data = require("../../../../assets/geofences-output.json");
       }
+=======
+      const data = require("../../../../assets/geofences-output.json");
+>>>>>>> Stashed changes
       const fencesWithDistance = data.map((f: GeoFence) => ({
         ...f,
         distanceToUser: undefined,
@@ -171,6 +267,7 @@ export default function MapboxMap({
 
   const loadAndFilterFences = async (userLat: number, userLng: number) => {
     try {
+<<<<<<< Updated upstream
       const geofenceService = require("../services/geofenceService").default;
       let data = geofenceService.getFences();
       if (!data || data.length === 0) {
@@ -180,6 +277,9 @@ export default function MapboxMap({
       if (!data || data.length === 0) {
         data = require("../../../../assets/geofences-output.json");
       }
+=======
+      const data = require("../../../../assets/geofences-output.json");
+>>>>>>> Stashed changes
       // Add default visualStyle to bundled data if missing
       const dataWithStyle = data.map((f: GeoFence) => ({
         ...f,
@@ -311,10 +411,14 @@ export default function MapboxMap({
     const geofences = fencesToCount.filter(
       (f) =>
         f.visualStyle?.zoneType === "geofence" ||
+<<<<<<< Updated upstream
         f.visualStyle?.zoneType === "itinerary_geofence" ||
         f.category === "Tourist Destination" ||
         f.category === "Itinerary Geofence" ||
         f.metadata?.sourceType === "itinerary",
+=======
+        f.category === "Tourist Destination",
+>>>>>>> Stashed changes
     ).length;
 
     setDangerZoneCount(danger);

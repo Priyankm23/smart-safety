@@ -113,9 +113,12 @@ export default function IncidentReportModal({
       console.log(
         "[IncidentReport] Requesting safety score update after incident report",
       );
+<<<<<<< Updated upstream
       if (latitude && longitude) {
         touristSocketService.updateLocation({ lat: latitude, lng: longitude });
       }
+=======
+>>>>>>> Stashed changes
       touristSocketService.requestSafetyScoreUpdate();
 
       Alert.alert(

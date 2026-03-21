@@ -1337,6 +1337,7 @@ export const generateMapHTML = (accessToken?: string): string => {
                  userMarker.setLngLat([lng, lat]);
               }
               
+<<<<<<< Updated upstream
               // FlyTo on first load only
               if (isFirstLoad) {
                 map.flyTo({ center: [lng, lat], zoom: zoom || 14 });
@@ -1356,6 +1357,10 @@ export const generateMapHTML = (accessToken?: string): string => {
                             } catch (e) {
                                 console.warn('accuracy ring update failed', e);
                             }
+=======
+              // FlyTo on every location update
+              map.flyTo({ center: [lng, lat], zoom: zoom || map.getZoom() });
+>>>>>>> Stashed changes
           }
 
           // --- GEOFENCE FUNCTIONS (Kept from original logic) ---
